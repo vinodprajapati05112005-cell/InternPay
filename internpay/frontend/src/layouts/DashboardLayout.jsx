@@ -1,20 +1,28 @@
 import React, { useState } from 'react';
-import { Outlet, Link, useLocation } from 'react-router-dom';
+import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { LayoutDashboard, FileText, CheckSquare, Scale, Settings, User, LogOut, Menu, X, Bell } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { getRoleLabel, getUserDisplayName, getUserInitial } from '../utils/navigation';
 
 const DashboardLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
   
   // Determine role based on URL path to render appropriate sidebar
   const getRole = () => {
     if (location.pathname.startsWith('/company')) return 'company';
     if (location.pathname.startsWith('/student')) return 'student';
     if (location.pathname.startsWith('/judge')) return 'judge';
-    return 'company'; // default fallback
+    return (user?.role || 'COMPANY').toLowerCase();
   };
 
   const role = getRole();
+  const displayName = getUserDisplayName(user);
+  const roleLabel = getRoleLabel(user?.role || role);
+  const initials = getUserInitial(user);
 
   const navItems = {
     company: [
@@ -42,6 +50,16 @@ const DashboardLayout = () => {
   };
 
   const currentNav = navItems[role];
+
+  const handleLogout = async () => {
+    try {
+      setIsLoggingOut(true);
+      await logout();
+      navigate('/login', { replace: true });
+    } finally {
+      setIsLoggingOut(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 flex">
@@ -91,17 +109,22 @@ const DashboardLayout = () => {
         <div className="p-4 border-t border-slate-200">
           <div className="flex items-center gap-3 mb-4">
             <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold">
-              {role === 'company' ? 'C' : role === 'student' ? 'S' : 'J'}
+              {initials}
             </div>
             <div>
-              <p className="text-sm font-medium text-slate-900">Demo User</p>
-              <p className="text-xs text-slate-500 capitalize">{role}</p>
+              <p className="text-sm font-medium text-slate-900">{displayName}</p>
+              <p className="text-xs text-slate-500">{roleLabel}</p>
             </div>
           </div>
-          <Link to="/" className="flex items-center gap-3 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+          <button
+            type="button"
+            onClick={handleLogout}
+            disabled={isLoggingOut}
+            className="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-60"
+          >
             <LogOut size={18} />
-            Log out
-          </Link>
+            {isLoggingOut ? 'Logging out...' : 'Log out'}
+          </button>
         </div>
       </aside>
 
@@ -125,7 +148,7 @@ const DashboardLayout = () => {
             </button>
             <div className="px-3 py-1.5 bg-green-50 text-green-700 border border-green-200 rounded-full text-xs font-medium flex items-center gap-1.5 shadow-sm">
               <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>
-              Wallet Connected
+              {displayName}
             </div>
           </div>
         </header>

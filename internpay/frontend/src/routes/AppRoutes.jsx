@@ -1,9 +1,12 @@
 import React from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Navigate, Routes, Route } from 'react-router-dom';
 
 // Layouts
 import MainLayout from '../layouts/MainLayout';
 import DashboardLayout from '../layouts/DashboardLayout';
+import ProtectedRoute from '../components/auth/ProtectedRoute';
+import { useAuth } from '../context/AuthContext';
+import { getDashboardPath } from '../utils/navigation';
 
 import Home from '../pages/public/Home';
 import HowItWorks from '../pages/public/HowItWorks';
@@ -49,6 +52,11 @@ import JudgeDisputeDetails from '../pages/judge/JudgeDisputeDetails';
 import JudgeProfile from '../pages/judge/JudgeProfile';
 import JudgeReputation from '../pages/judge/JudgeReputation';
 
+const DashboardRedirect = () => {
+  const { user } = useAuth();
+  return <Navigate to={getDashboardPath(user?.role)} replace />;
+};
+
 const AppRoutes = () => {
   return (
     <Routes>
@@ -67,6 +75,10 @@ const AppRoutes = () => {
         <Route path="/contact" element={<Contact />} />
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/terms" element={<Terms />} />
+      </Route>
+
+      {/* Auth Routes */}
+      <Route element={<ProtectedRoute guestOnly />}>
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/connect-wallet" element={<ConnectWallet />} />
@@ -74,33 +86,36 @@ const AppRoutes = () => {
       </Route>
 
       {/* Dashboard Layout Routes */}
-      <Route element={<DashboardLayout />}>
-        <Route path="/company/dashboard" element={<CompanyDashboard />} />
-        <Route path="/company/contracts" element={<CompanyContracts />} />
-        <Route path="/company/contracts/create" element={<CreateContract />} />
-        <Route path="/company/contracts/:id" element={<CompanyContractDetails />} />
-        <Route path="/company/contracts/:id/fund" element={<FundContract />} />
-        <Route path="/company/submissions" element={<CompanySubmissions />} />
-        <Route path="/company/submissions/:id" element={<CompanySubmissionDetails />} />
-        <Route path="/company/disputes" element={<CompanyDisputes />} />
-        <Route path="/company/disputes/:id" element={<CompanyDisputeDetails />} />
-        <Route path="/company/profile" element={<CompanyProfile />} />
-        <Route path="/company/settings" element={<CompanySettings />} />
-        <Route path="/student/dashboard" element={<StudentDashboard />} />
-        <Route path="/student/contracts" element={<StudentContracts />} />
-        <Route path="/student/contracts/:id" element={<StudentContractDetails />} />
-        <Route path="/student/contracts/:id/submit" element={<SubmitWork />} />
-        <Route path="/student/submissions" element={<StudentSubmissions />} />
-        <Route path="/student/submissions/:id" element={<StudentSubmissionDetails />} />
-        <Route path="/student/submissions/:id/report" element={<ReportSubmission />} />
-        <Route path="/student/payments" element={<StudentPayments />} />
-        <Route path="/student/profile" element={<StudentProfile />} />
-        <Route path="/student/settings" element={<StudentSettings />} />
-        <Route path="/judge/dashboard" element={<JudgeDashboard />} />
-        <Route path="/judge/disputes" element={<JudgeDisputes />} />
-        <Route path="/judge/disputes/:id" element={<JudgeDisputeDetails />} />
-        <Route path="/judge/profile" element={<JudgeProfile />} />
-        <Route path="/judge/reputation" element={<JudgeReputation />} />
+      <Route element={<ProtectedRoute />}>
+        <Route path="/dashboard" element={<DashboardRedirect />} />
+        <Route element={<DashboardLayout />}>
+          <Route path="/company/dashboard" element={<CompanyDashboard />} />
+          <Route path="/company/contracts" element={<CompanyContracts />} />
+          <Route path="/company/contracts/create" element={<CreateContract />} />
+          <Route path="/company/contracts/:id" element={<CompanyContractDetails />} />
+          <Route path="/company/contracts/:id/fund" element={<FundContract />} />
+          <Route path="/company/submissions" element={<CompanySubmissions />} />
+          <Route path="/company/submissions/:id" element={<CompanySubmissionDetails />} />
+          <Route path="/company/disputes" element={<CompanyDisputes />} />
+          <Route path="/company/disputes/:id" element={<CompanyDisputeDetails />} />
+          <Route path="/company/profile" element={<CompanyProfile />} />
+          <Route path="/company/settings" element={<CompanySettings />} />
+          <Route path="/student/dashboard" element={<StudentDashboard />} />
+          <Route path="/student/contracts" element={<StudentContracts />} />
+          <Route path="/student/contracts/:id" element={<StudentContractDetails />} />
+          <Route path="/student/contracts/:id/submit" element={<SubmitWork />} />
+          <Route path="/student/submissions" element={<StudentSubmissions />} />
+          <Route path="/student/submissions/:id" element={<StudentSubmissionDetails />} />
+          <Route path="/student/submissions/:id/report" element={<ReportSubmission />} />
+          <Route path="/student/payments" element={<StudentPayments />} />
+          <Route path="/student/profile" element={<StudentProfile />} />
+          <Route path="/student/settings" element={<StudentSettings />} />
+          <Route path="/judge/dashboard" element={<JudgeDashboard />} />
+          <Route path="/judge/disputes" element={<JudgeDisputes />} />
+          <Route path="/judge/disputes/:id" element={<JudgeDisputeDetails />} />
+          <Route path="/judge/profile" element={<JudgeProfile />} />
+          <Route path="/judge/reputation" element={<JudgeReputation />} />
+        </Route>
       </Route>
     </Routes>
   );
