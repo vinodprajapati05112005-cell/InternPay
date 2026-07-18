@@ -1,0 +1,29 @@
+[package]
+name = "internpay-escrow"
+version = "0.1.0"
+edition = "2021"
+resolver = "2"
+
+[dependencies]
+stylus-sdk = "0.10.8"
+alloy-primitives = { version = "1.6.1", default-features = false, features = ["tiny-keccak"] }
+alloy-sol-types = { version = "1.6.1", default-features = false }
+mini-alloc = "0.9.2"
+
+[features]
+export-abi = ["stylus-sdk/export-abi"]
+
+[lib]
+crate-type = ["lib", "cdylib"]
+
+[[bin]]
+name = "export-abi"
+path = "src/main.rs"
+required-features = ["export-abi"]
+
+[profile.release]
+codegen-units = 1
+opt-level = "z"
+lto = true
+strip = true
+panic = "abort"
