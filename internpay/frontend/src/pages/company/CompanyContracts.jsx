@@ -18,7 +18,7 @@ import {
 import { contractApi } from '../../services/api';
 import { formatCurrency, formatDate, daysUntil, humanizeEnum } from '../../utils/formatters';
 
-const statusTabs = ['ALL', 'ACTIVE', 'FUNDED', 'IN_PROGRESS', 'SUBMITTED', 'COMPLETED', 'DISPUTED', 'CANCELLED'];
+const statusTabs = ['ALL', 'PENDING', 'ACTIVE', 'FUNDED', 'IN_PROGRESS', 'SUBMITTED', 'COMPLETED', 'DISPUTED', 'CANCELLED', 'REJECTED', 'FAILED', 'DRAFT'];
 
 const statusColors = {
   ACTIVE: 'bg-blue-50 text-blue-700 border-blue-200',
@@ -28,7 +28,12 @@ const statusColors = {
   COMPLETED: 'bg-violet-50 text-violet-700 border-violet-200',
   DISPUTED: 'bg-rose-50 text-rose-700 border-rose-200',
   CANCELLED: 'bg-slate-100 text-slate-600 border-slate-200',
+  PENDING: 'bg-amber-50 text-amber-700 border border-amber-200',
+  REJECTED: 'bg-rose-50 text-rose-700 border border-rose-200',
+  FAILED: 'bg-red-50 text-red-700 border border-red-200',
+  DRAFT: 'bg-slate-50 text-slate-600 border border-slate-200',
 };
+
 
 const CompanyContracts = () => {
   const [contracts, setContracts] = useState([]);

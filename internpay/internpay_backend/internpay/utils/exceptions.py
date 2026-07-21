@@ -22,6 +22,9 @@ def _error_message(exc: Exception) -> str:
 def exception_handler(exc, context):
     response = drf_exception_handler(exc, context)
     if response is None:
+        import traceback
+        print("UNHANDLED EXCEPTION IN VIEW:")
+        traceback.print_exc()
         return Response(
             {
                 "success": False,

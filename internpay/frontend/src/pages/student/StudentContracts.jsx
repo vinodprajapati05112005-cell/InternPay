@@ -17,13 +17,17 @@ import { studentApi } from '../../services/api';
 import { daysUntil, formatCurrency, formatDate, humanizeEnum } from '../../utils/formatters';
 
 const statusColors = {
-  ACTIVE: 'bg-blue-100 text-blue-700',
-  FUNDED: 'bg-emerald-100 text-emerald-700',
-  IN_PROGRESS: 'bg-indigo-100 text-indigo-700',
-  SUBMITTED: 'bg-amber-100 text-amber-700',
-  COMPLETED: 'bg-green-100 text-green-700',
-  DISPUTED: 'bg-red-100 text-red-700',
-  CANCELLED: 'bg-slate-100 text-slate-700',
+  PENDING: 'bg-amber-100 text-amber-700 border border-amber-200',
+  REJECTED: 'bg-rose-100 text-rose-700 border border-rose-200',
+  FAILED: 'bg-red-100 text-red-700 border border-red-200',
+  ACTIVE: 'bg-blue-100 text-blue-700 border border-blue-200',
+  FUNDED: 'bg-emerald-100 text-emerald-700 border border-emerald-200',
+  IN_PROGRESS: 'bg-indigo-100 text-indigo-700 border border-indigo-200',
+  SUBMITTED: 'bg-amber-100 text-amber-700 border border-amber-200',
+  COMPLETED: 'bg-green-100 text-green-700 border border-green-200',
+  DISPUTED: 'bg-red-100 text-red-700 border border-red-200',
+  CANCELLED: 'bg-slate-100 text-slate-600 border border-slate-200',
+  DRAFT: 'bg-slate-100 text-slate-500 border border-slate-200',
 };
 
 const StudentContracts = () => {
@@ -62,7 +66,8 @@ const StudentContracts = () => {
     };
   }, []);
 
-  const statuses = ['ALL', 'ACTIVE', 'FUNDED', 'IN_PROGRESS', 'SUBMITTED', 'COMPLETED', 'DISPUTED', 'CANCELLED'];
+  const statuses = ['ALL', 'PENDING', 'ACTIVE', 'FUNDED', 'IN_PROGRESS', 'SUBMITTED', 'COMPLETED', 'DISPUTED', 'CANCELLED', 'REJECTED', 'FAILED'];
+
 
   const filteredContracts = useMemo(() => {
     return statusFilter === 'ALL'
@@ -198,7 +203,11 @@ const StudentContracts = () => {
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-16">
           <FileText className="w-16 h-16 text-slate-300 mx-auto mb-4" />
           <h3 className="text-lg font-semibold text-slate-900">No contracts found</h3>
-          <p className="text-slate-500 mt-1">No contracts match the selected filter.</p>
+          <p className="text-slate-500 mt-1">
+            {statusFilter === 'ALL'
+              ? 'You have no contracts yet. Contracts assigned to you will appear here.'
+              : `No ${statusFilter.toLowerCase()} contracts. Try selecting a different filter.`}
+          </p>
         </motion.div>
       )}
     </div>

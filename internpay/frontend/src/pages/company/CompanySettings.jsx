@@ -15,7 +15,7 @@ import {
   Building2,
   Loader2,
 } from 'lucide-react';
-import { companyApi } from '../../services/api';
+import { companyApi, authApi } from '../../services/api';
 import { formatDate, humanizeEnum } from '../../utils/formatters';
 
 const STORAGE_KEY = 'internpay_company_notification_prefs';
@@ -39,6 +39,7 @@ const CompanySettings = () => {
     company_address: '',
     description: '',
     team_size: '',
+    wallet_address: '',
   });
   const [notifications, setNotifications] = useState(defaultNotifications);
   const [isLoading, setIsLoading] = useState(true);
@@ -65,7 +66,10 @@ const CompanySettings = () => {
       setError('');
 
       try {
-        const profileData = await companyApi.profile();
+        const [authProfile, profileData] = await Promise.all([
+          authApi.profile(),
+          companyApi.profile(),
+        ]);
         if (!cancelled) {
           setProfile(profileData || null);
           setForm({
@@ -76,6 +80,7 @@ const CompanySettings = () => {
             company_address: profileData?.company_address || '',
             description: profileData?.description || '',
             team_size: profileData?.team_size || '',
+            wallet_address: authProfile?.wallet_address || '',
           });
         }
       } catch (loadError) {
@@ -95,6 +100,7 @@ const CompanySettings = () => {
       cancelled = true;
     };
   }, []);
+
 
   const handleChange = (field, value) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -116,18 +122,24 @@ const CompanySettings = () => {
     setError('');
 
     try {
-      await companyApi.updateProfile({
-        company_name: form.company_name.trim(),
-        company_website: form.company_website.trim(),
-        company_registration_number: form.company_registration_number.trim(),
-        company_industry: form.company_industry.trim(),
-        company_address: form.company_address.trim(),
-        description: form.description.trim(),
-        team_size: form.team_size ? Number(form.team_size) : null,
-      });
+      await Promise.all([
+        companyApi.updateProfile({
+          company_name: form.company_name.trim(),
+          company_website: form.company_website.trim(),
+          company_registration_number: form.company_registration_number.trim(),
+          company_industry: form.company_industry.trim(),
+          company_address: form.company_address.trim(),
+          description: form.description.trim(),
+          team_size: form.team_size ? Number(form.team_size) : null,
+        }),
+        authApi.updateProfile({
+          wallet_address: form.wallet_address.trim(),
+        }),
+      ]);
 
       const nextProfile = await companyApi.profile();
       setProfile(nextProfile || null);
+
       setShowToast(true);
       window.setTimeout(() => setShowToast(false), 2500);
     } catch (saveError) {
@@ -253,8 +265,20 @@ const CompanySettings = () => {
                 className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
+
+            <div className="mt-4">
+              <label className="block text-sm font-semibold text-slate-700 mb-1.5">Wallet Address (EVM Compatible)</label>
+              <input
+                type="text"
+                value={form.wallet_address}
+                onChange={(event) => handleChange('wallet_address', event.target.value)}
+                placeholder="0x..."
+                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono"
+              />
+            </div>
           </div>
         </motion.div>
+
 
         <motion.div
           initial={{ opacity: 0, y: 20 }}

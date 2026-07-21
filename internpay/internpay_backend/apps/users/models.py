@@ -8,6 +8,7 @@ from django.utils import timezone
 
 from apps.common.choices import UserRole
 from apps.common.models import BaseModel
+from apps.common.validators import validate_wallet_address
 from internpay.utils.files import avatar_upload_path
 
 
@@ -48,7 +49,15 @@ class User(BaseModel, AbstractBaseUser, PermissionsMixin):
     first_name = models.CharField(max_length=150)
     last_name = models.CharField(max_length=150)
     phone_number = models.CharField(max_length=30, blank=True, default="")
+    wallet_address = models.CharField(
+        max_length=42,
+        blank=True,
+        default="",
+        db_index=True,
+        validators=[validate_wallet_address],
+    )
     avatar = models.ImageField(upload_to=avatar_upload_path, blank=True, null=True)
+
     role = models.CharField(max_length=20, choices=UserRole.choices, default=UserRole.STUDENT, db_index=True)
     is_email_verified = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)

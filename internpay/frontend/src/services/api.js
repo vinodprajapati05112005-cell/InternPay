@@ -216,8 +216,11 @@ export const contractApi = {
   addMilestones: (id, data) => api.post(`/api/contracts/${id}/milestones/`, data),
   cancel: (id, data = {}) => api.post(`/api/contracts/${id}/cancel/`, data),
   fund: (id, data = {}) => api.post(`/api/contracts/${id}/fund/`, data),
+  accept: (id) => api.post(`/api/contracts/${id}/accept/`, {}),
+  reject: (id) => api.post(`/api/contracts/${id}/reject/`, {}),
   dashboard: () => api.get('/api/contracts/dashboard/'),
 };
+
 
 export const submissionApi = {
   list: () => api.get('/api/submissions/'),

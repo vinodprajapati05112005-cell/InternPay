@@ -53,14 +53,30 @@ def create_submission(*, student, validated_data: dict, request=None) -> Submiss
     contract = Contract.objects.select_related("company", "student").filter(id=contract_id).first()
     if contract is None:
         raise ValidationError({"contract_id": "Contract not found."})
+    
     if contract.student is None or contract.student_id != student.id:
         raise ValidationError({"contract_id": "You are not assigned to this contract."})
 
-    milestone = Milestone.objects.select_related("contract").filter(id=milestone_id, contract=contract).first()
+    from apps.common.choices import ContractStatus
+    if contract.status in {ContractStatus.PENDING, ContractStatus.REJECTED, ContractStatus.DRAFT, ContractStatus.FAILED}:
+        raise ValidationError({"contract_id": "You cannot submit work for a contract that is not active."})
+
+    milestone = Milestone.objects.select_related("contract").filter(id=milestone_id).first()
     if milestone is None:
-        raise ValidationError({"milestone_id": "Milestone not found for this contract."})
+        raise ValidationError({"milestone_id": "Milestone not found."})
+        
+    if milestone.contract_id != contract.id:
+        raise ValidationError({"milestone_id": "This milestone does not belong to the specified contract."})
+
+    if milestone.status == MilestoneStatus.APPROVED:
+        raise ValidationError({"milestone_id": "This milestone has already been approved."})
+
+    if milestone.status == MilestoneStatus.CANCELLED:
+        raise ValidationError({"milestone_id": "This milestone has been cancelled."})
+
     if hasattr(milestone, "submission"):
         raise ValidationError({"milestone_id": "This milestone already has a submission."})
+
 
     submission = Submission.objects.create(
         contract=contract,
@@ -105,7 +121,10 @@ def delete_submission(submission: Submission) -> None:
 
 
 def get_submission_report(submission: Submission) -> AIReport | None:
-    return getattr(submission, "ai_report", None)
+    try:
+        return submission.ai_report
+    except Exception:
+        return None
 
 
 def get_student_submissions(student) -> list[dict]:

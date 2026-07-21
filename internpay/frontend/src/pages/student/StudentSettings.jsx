@@ -22,6 +22,7 @@ const StudentSettings = () => {
     first_name: '',
     last_name: '',
     phone_number: '',
+    wallet_address: '',
     bio: '',
     portfolio_url: '',
     skills: '',
@@ -62,12 +63,14 @@ const StudentSettings = () => {
             first_name: authProfile?.first_name || '',
             last_name: authProfile?.last_name || '',
             phone_number: authProfile?.phone_number || '',
+            wallet_address: authProfile?.wallet_address || '',
             bio: studentProfile?.bio || '',
             portfolio_url: studentProfile?.portfolio_url || '',
             skills: Array.isArray(studentProfile?.skills) ? studentProfile.skills.join(', ') : '',
           });
         }
       } catch (loadError) {
+
         if (!cancelled) {
           setError(loadError?.message || 'Unable to load settings.');
         }
@@ -111,7 +114,9 @@ const StudentSettings = () => {
           first_name: form.first_name.trim(),
           last_name: form.last_name.trim(),
           phone_number: form.phone_number.trim(),
+          wallet_address: form.wallet_address.trim(),
         }),
+
         studentApi.updateProfile({
           bio: form.bio.trim(),
           portfolio_url: form.portfolio_url.trim(),
@@ -222,7 +227,19 @@ const StudentSettings = () => {
                       />
                     </div>
                   </div>
+
+                  <div className="mt-4">
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Wallet Address (EVM Compatible)</label>
+                    <input
+                      type="text"
+                      value={form.wallet_address}
+                      onChange={(event) => handleChange('wallet_address', event.target.value)}
+                      placeholder="0x..."
+                      className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-600 focus:border-transparent outline-none transition-all font-mono text-sm"
+                    />
+                  </div>
                 </div>
+
 
                 <div className="pt-6 border-t border-slate-200">
                   <h2 className="text-xl font-bold text-slate-900 mb-4">Student Profile</h2>

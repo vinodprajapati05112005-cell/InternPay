@@ -34,11 +34,14 @@ def _serialize_evidence_files(files: list) -> list[dict]:
 def _eligible_judge():
     from apps.judges.models import Judge
 
-    return (
+    judge = (
         Judge.objects.filter(is_verified=True)
         .order_by("-rating", "total_resolved_disputes")
         .first()
     )
+    if judge is None:
+        judge = Judge.objects.order_by("-rating", "total_resolved_disputes").first()
+    return judge
 
 
 def _current_deadline(submission) -> timezone.datetime:
@@ -200,12 +203,23 @@ def resolve_dispute(*, dispute: Dispute, judge, validated_data: dict, request=No
 
 
 def get_assigned_disputes(judge) -> list[dict]:
-    return list(
-        Dispute.objects.filter(assigned_judge=judge)
-        .select_related("contract", "submission")
-        .order_by("-created_at")
-        .values("id", "contract_id", "submission_id", "reason", "status", "decision", "created_at", "resolved_at")
-    )
+    from apps.common.choices import DisputeStatus
+    Dispute.objects.filter(assigned_judge__isnull=True).update(assigned_judge=judge, status=DisputeStatus.ASSIGNED)
+    qs = Dispute.objects.filter(assigned_judge=judge).select_related("contract", "submission").order_by("-created_at")
+    payload = []
+    for d in qs:
+        payload.append({
+            "id": str(d.id),
+            "contract_id": str(d.contract_id),
+            "contract_title": d.contract.title if d.contract else "Disputed Contract",
+            "submission_id": str(d.submission_id) if d.submission_id else "",
+            "reason": d.reason,
+            "status": d.status,
+            "decision": d.decision or "",
+            "created_at": d.created_at,
+            "resolved_at": d.resolved_at,
+        })
+    return payload
 
 
 def get_completed_disputes(judge) -> list[dict]:

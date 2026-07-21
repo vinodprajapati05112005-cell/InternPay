@@ -45,3 +45,12 @@ def validate_file_upload(file_obj, max_size_mb: int = 25, allowed_extensions: tu
 def validate_password_strength(value):
     if len(value or "") < 8:
         raise ValidationError(_("Password must be at least 8 characters long."))
+
+
+def validate_wallet_address(value):
+    if value:
+        import re
+        pattern = re.compile(r"^0x[a-fA-F0-9]{40}$")
+        if not pattern.match(str(value)):
+            raise ValidationError(_("Invalid Ethereum wallet address format."))
+

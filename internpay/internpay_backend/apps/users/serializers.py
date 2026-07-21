@@ -16,7 +16,19 @@ class RegisterSerializer(serializers.Serializer):
     first_name = serializers.CharField(max_length=150)
     last_name = serializers.CharField(max_length=150)
     phone_number = serializers.CharField(max_length=30, required=False, allow_blank=True)
+    wallet_address = serializers.CharField(max_length=42, required=False, allow_blank=True)
     role = serializers.ChoiceField(choices=UserRole.choices)
+
+    def validate_wallet_address(self, value):
+        if value:
+            from apps.common.validators import validate_wallet_address
+            from django.core.exceptions import ValidationError as DjangoValidationError
+            try:
+                validate_wallet_address(value)
+            except DjangoValidationError as e:
+                raise serializers.ValidationError(e.message)
+        return value
+
 
     company_name = serializers.CharField(max_length=255, required=False, allow_blank=True)
     company_website = serializers.URLField(required=False, allow_blank=True)
@@ -35,6 +47,11 @@ class RegisterSerializer(serializers.Serializer):
     specialization = serializers.CharField(max_length=255, required=False, allow_blank=True)
     years_experience = serializers.IntegerField(required=False, allow_null=True)
     license_number = serializers.CharField(max_length=100, required=False, allow_blank=True)
+
+    def validate_email(self, value):
+        if User.objects.filter(email__iexact=value).exists():
+            raise serializers.ValidationError("A user with this email already exists.")
+        return value
 
     def validate_password(self, value):
         validate_password_strength(value)
@@ -164,6 +181,7 @@ class ProfileSerializer(serializers.ModelSerializer):
             "first_name",
             "last_name",
             "phone_number",
+            "wallet_address",
             "avatar",
             "role",
             "is_email_verified",
@@ -254,10 +272,11 @@ class ProfileSerializer(serializers.ModelSerializer):
             {
                 key: value
                 for key, value in validated_data.items()
-                if key in profile_fields or key in {"first_name", "last_name", "phone_number", "avatar"}
+                if key in profile_fields or key in {"first_name", "last_name", "phone_number", "avatar", "wallet_address"}
             },
         )
         return instance
+
 
 
 class PermissionsSerializer(serializers.Serializer):

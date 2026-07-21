@@ -41,37 +41,26 @@ const SubmitWork = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
 
+  const loadContract = async () => {
+    setIsLoading(true);
+    setErrors({});
+
+    try {
+      const data = await contractApi.detail(id);
+      setContract(data || null);
+      const firstMilestone = data?.milestones?.find((milestone) => milestone.status !== 'APPROVED' && milestone.status !== 'CANCELLED');
+      setSelectedMilestoneId(firstMilestone?.id || data?.milestones?.[0]?.id || '');
+    } catch (loadError) {
+      setErrors({ _form: loadError?.message || 'Unable to load the contract.' });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
-    let cancelled = false;
-
-    const loadContract = async () => {
-      setIsLoading(true);
-      setErrors({});
-
-      try {
-        const data = await contractApi.detail(id);
-        if (!cancelled) {
-          setContract(data || null);
-          const firstMilestone = data?.milestones?.find((milestone) => milestone.status !== 'APPROVED' && milestone.status !== 'CANCELLED');
-          setSelectedMilestoneId(firstMilestone?.id || data?.milestones?.[0]?.id || '');
-        }
-      } catch (loadError) {
-        if (!cancelled) {
-          setErrors({ _form: loadError?.message || 'Unable to load the contract.' });
-        }
-      } finally {
-        if (!cancelled) {
-          setIsLoading(false);
-        }
-      }
-    };
-
     void loadContract();
-
-    return () => {
-      cancelled = true;
-    };
   }, [id]);
+
 
   const selectedMilestone = useMemo(() => {
     return contract?.milestones?.find((milestone) => milestone.id === selectedMilestoneId) || null;
@@ -129,10 +118,64 @@ const SubmitWork = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-slate-50 p-4 sm:p-6 lg:p-8 flex items-center justify-center">
-        <div className="flex items-center gap-3 text-slate-500">
-          <Loader2 className="w-5 h-5 animate-spin" />
-          Loading contract...
+      <div className="min-h-screen bg-slate-50 p-4 sm:p-6 lg:p-8">
+        <div className="max-w-7xl mx-auto space-y-6">
+          <div className="h-5 w-32 bg-slate-200 rounded animate-pulse" />
+          <div className="space-y-2">
+            <div className="h-9 w-48 bg-slate-200 rounded animate-pulse" />
+            <div className="h-5 w-80 bg-slate-200 rounded animate-pulse" />
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_0.9fr] gap-6">
+            <div className="space-y-6">
+              <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-4">
+                <div className="h-6 w-40 bg-slate-200 rounded animate-pulse" />
+                <div className="h-4 w-64 bg-slate-200 rounded animate-pulse" />
+                <div className="space-y-3">
+                  <div className="h-16 w-full bg-slate-100 rounded-xl animate-pulse" />
+                </div>
+              </div>
+              <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-4">
+                <div className="h-6 w-36 bg-slate-200 rounded animate-pulse" />
+                <div className="h-4 w-52 bg-slate-200 rounded animate-pulse" />
+                <div className="h-12 w-full bg-slate-100 rounded-xl animate-pulse" />
+              </div>
+            </div>
+            <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-4">
+              <div className="h-6 w-36 bg-slate-200 rounded animate-pulse" />
+              <div className="space-y-2">
+                <div className="h-4 w-full bg-slate-100 rounded-pulse" />
+                <div className="h-4 w-3/4 bg-slate-100 rounded-pulse" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (errors._form && !contract) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+        <div className="text-center max-w-md bg-white p-8 rounded-2xl border border-slate-200 shadow-sm">
+          <div className="w-12 h-12 rounded-full bg-rose-50 border border-rose-100 flex items-center justify-center mx-auto mb-4">
+            <AlertCircle className="w-6 h-6 text-rose-600" />
+          </div>
+          <h2 className="text-lg font-bold text-slate-900">Failed to Load Contract</h2>
+          <p className="text-slate-500 mt-2 text-sm">{errors._form}</p>
+          <div className="mt-6 flex flex-col sm:flex-row gap-3 justify-center">
+            <button
+              onClick={() => void loadContract()}
+              className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-semibold text-sm transition-all shadow"
+            >
+              Retry Loading
+            </button>
+            <Link
+              to="/student/contracts"
+              className="px-5 py-2.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold text-sm transition-all"
+            >
+              Back to Contracts
+            </Link>
+          </div>
         </div>
       </div>
     );
@@ -141,11 +184,11 @@ const SubmitWork = () => {
   if (!contract) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
-        <div className="text-center max-w-md">
+        <div className="text-center max-w-md bg-white p-8 rounded-2xl border border-slate-200 shadow-sm">
           <FileText className="w-16 h-16 text-slate-300 mx-auto mb-4" />
           <h2 className="text-xl font-semibold text-slate-900">Contract Not Found</h2>
-          <p className="text-slate-500 mt-2">{errors._form || 'We could not load this contract.'}</p>
-          <Link to="/student/contracts" className="mt-4 inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 font-medium">
+          <p className="text-slate-500 mt-2 text-sm">We could not locate the requested contract details.</p>
+          <Link to="/student/contracts" className="mt-6 inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 font-medium">
             <ArrowLeft className="w-4 h-4" />
             Back to Contracts
           </Link>
@@ -154,13 +197,57 @@ const SubmitWork = () => {
     );
   }
 
+  const milestoneOptions = contract.milestones || [];
+
+  if (milestoneOptions.length === 0) {
+    return (
+      <div className="min-h-screen bg-slate-50 p-4 sm:p-6 lg:p-8">
+        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
+          <Link to={`/student/contracts/${id}`} className="inline-flex items-center gap-2 text-slate-500 hover:text-blue-600 transition-colors text-sm font-medium">
+            <ArrowLeft className="w-4 h-4" />
+            Back to Contract
+          </Link>
+        </motion.div>
+
+        <div className="max-w-2xl mx-auto mt-12">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-white rounded-2xl border border-slate-200 shadow-sm p-8 text-center"
+          >
+            <div className="w-16 h-16 bg-amber-50 rounded-2xl flex items-center justify-center mx-auto mb-6 border border-amber-200">
+              <AlertCircle className="w-8 h-8 text-amber-500" />
+            </div>
+            <h2 className="text-xl font-bold text-slate-900 mb-2">No Milestones Defined</h2>
+            <p className="text-slate-500 mb-6 text-sm max-w-md mx-auto">
+              No milestones are available for this contract yet. The company must add a milestone before you can submit work.
+            </p>
+            <div className="flex justify-center gap-3">
+              <Link
+                to={`/student/contracts/${id}`}
+                className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-semibold text-sm shadow transition-all"
+              >
+                View Contract Details
+              </Link>
+              <Link
+                to="/student/contracts"
+                className="px-5 py-2.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold text-sm transition-all"
+              >
+                Back to My Contracts
+              </Link>
+            </div>
+          </motion.div>
+        </div>
+      </div>
+    );
+  }
+
+
   const processingSteps = [
     { label: 'Validating links...', icon: Globe },
     { label: 'Submitting to backend...', icon: Send },
     { label: 'Triggering AI evaluation...', icon: Sparkles },
   ];
-
-  const milestoneOptions = contract.milestones || [];
 
   return (
     <div className="min-h-screen bg-slate-50 p-4 sm:p-6 lg:p-8">
@@ -173,10 +260,11 @@ const SubmitWork = () => {
 
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="mb-8">
         <h1 className="text-3xl font-extrabold text-slate-900">Submit Work</h1>
-        <p className="text-slate-500 mt-1">
-          Submit your work for <span className="font-semibold text-slate-700">{contract.title}</span>
+        <p className="text-slate-500 mt-1 break-words whitespace-normal max-w-full">
+          Submit your work for <span className="font-semibold text-slate-700 break-words">{contract.title}</span>
         </p>
       </motion.div>
+
 
       {successMessage && (
         <div className="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
@@ -306,7 +394,7 @@ const SubmitWork = () => {
             <div className="space-y-4 text-sm">
               <div>
                 <p className="text-xs uppercase tracking-wider text-slate-400">Contract</p>
-                <p className="font-semibold text-slate-900 mt-1">{contract.title}</p>
+                <p className="font-semibold text-slate-900 mt-1 break-words">{contract.title}</p>
               </div>
               <div>
                 <p className="text-xs uppercase tracking-wider text-slate-400">Company</p>

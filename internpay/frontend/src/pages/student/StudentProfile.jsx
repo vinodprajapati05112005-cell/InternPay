@@ -188,6 +188,20 @@ const StudentProfile = () => {
                     {humanizeEnum(profile?.verification_status)}
                   </span>
                 </div>
+                <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-2xl bg-slate-50 border border-slate-200 rounded-xl p-4">
+                  <div>
+                    <span className="block text-2xs font-bold text-slate-400 uppercase tracking-wider">Student Profile ID (for contracts)</span>
+                    <code className="text-xs text-slate-700 font-mono select-all break-all">{profile?.id}</code>
+                  </div>
+                  <div>
+                    <span className="block text-2xs font-bold text-slate-400 uppercase tracking-wider">User Account ID</span>
+                    <code className="text-xs text-slate-700 font-mono select-all break-all">{user?.id}</code>
+                  </div>
+                  <div className="sm:col-span-2 border-t border-slate-200 pt-2.5 mt-1">
+                    <span className="block text-2xs font-bold text-slate-400 uppercase tracking-wider">Linked Wallet Address</span>
+                    <code className="text-xs text-slate-700 font-mono select-all break-all">{user?.wallet_address || 'Not linked. Update in Settings.'}</code>
+                  </div>
+                </div>
               </div>
               <Link
                 to="/student/settings"

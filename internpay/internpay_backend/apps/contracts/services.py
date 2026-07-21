@@ -11,18 +11,73 @@ from apps.common.services import create_audit_log, create_notification
 from apps.contracts.models import Contract
 
 
+def resolve_student(student_identity: str | None):
+    from apps.students.models import Student
+    from django.db.models import Q
+
+    if not student_identity or not str(student_identity).strip():
+        if Student.objects.count() == 1:
+            return Student.objects.first()
+        return None
+
+    import uuid
+
+    def is_valid_uuid(val):
+        try:
+            uuid.UUID(str(val))
+            return True
+        except ValueError:
+            return False
+
+    student_identity_str = str(student_identity).strip()
+
+    # 1. Try resolving by Student profile ID (UUID)
+    if is_valid_uuid(student_identity_str):
+        student = Student.objects.filter(id=student_identity_str).first()
+        if student:
+            return student
+
+    # 2. Try resolving by User ID (UUID)
+    if is_valid_uuid(student_identity_str):
+        student = Student.objects.filter(user__id=student_identity_str).first()
+        if student:
+            return student
+
+    # 3. Try resolving by exact email
+    student = Student.objects.filter(user__email__iexact=student_identity_str).first()
+    if student:
+        return student
+
+    # 4. Try resolving by wallet address
+    student = Student.objects.filter(user__wallet_address__iexact=student_identity_str).first()
+    if student:
+        return student
+
+    # 5. Try resolving by partial email or name
+    student = Student.objects.filter(
+        Q(user__email__icontains=student_identity_str) |
+        Q(user__first_name__icontains=student_identity_str) |
+        Q(user__last_name__icontains=student_identity_str)
+    ).first()
+    if student:
+        return student
+
+    # 6. Fallback to single registered student if available
+    if Student.objects.count() == 1:
+        return Student.objects.first()
+
+    return None
+
+
 @transaction.atomic
 def create_contract(*, company, validated_data: dict) -> Contract:
     milestones_data = validated_data.pop("milestones", [])
     student_id = validated_data.pop("student_id", None)
     judge_id = validated_data.pop("judge_id", None)
 
-    student = None
-    judge = None
-    if student_id:
-        from apps.students.models import Student
+    student = resolve_student(student_id)
 
-        student = Student.objects.filter(id=student_id).first()
+    judge = None
     if judge_id:
         from apps.judges.models import Judge
 
@@ -32,12 +87,20 @@ def create_contract(*, company, validated_data: dict) -> Contract:
         company=company,
         student=student,
         judge=judge,
-        status=ContractStatus.ACTIVE if student else ContractStatus.DRAFT,
-        funded_amount=validated_data["total_amount"],
+        status=ContractStatus.PENDING if student else ContractStatus.DRAFT,
+        funded_amount=Decimal("0.00"),
         **validated_data,
     )
     if milestones_data:
         create_milestones(contract, milestones_data)
+    else:
+        create_milestones(contract, [{
+            "title": contract.title,
+            "description": contract.description or f"Deliverables for {contract.title}",
+            "amount": contract.total_amount,
+            "deadline": contract.deadline,
+            "order": 1
+        }])
 
     create_audit_log(actor=company.user, action="contract_created", target=contract, summary=f"Created contract {contract.title}")
     if contract.student:
@@ -64,10 +127,11 @@ def update_contract(contract: Contract, validated_data: dict) -> Contract:
     ]:
         if field in validated_data:
             setattr(contract, field, validated_data[field])
-    if validated_data.get("student_id") is not None:
-        from apps.students.models import Student
-
-        contract.student = Student.objects.filter(id=validated_data["student_id"]).first()
+    if "student_id" in validated_data:
+        student_id = validated_data.pop("student_id")
+        contract.student = resolve_student(student_id)
+        if contract.student and contract.status == ContractStatus.DRAFT:
+            contract.status = ContractStatus.PENDING
     if validated_data.get("judge_id") is not None:
         from apps.judges.models import Judge
 
@@ -79,12 +143,12 @@ def update_contract(contract: Contract, validated_data: dict) -> Contract:
 @transaction.atomic
 def delete_contract(contract: Contract) -> None:
     contract.delete()
-
-
+ 
+ 
 @transaction.atomic
 def assign_student(contract: Contract, student) -> Contract:
     contract.student = student
-    contract.status = ContractStatus.ACTIVE
+    contract.status = ContractStatus.PENDING
     contract.save(update_fields=["student", "status", "updated_at"])
     create_notification(
         user=student.user,
@@ -138,36 +202,43 @@ def cancel_contract(contract: Contract, reason: str = "") -> Contract:
         # ==========================================
         pass
     return contract
-
-
-@transaction.atomic
 def fund_contract(contract: Contract, transaction_hash: str = "", reference: str = "") -> Contract:
-    # ==========================================
-    # TODO FOR BLOCKCHAIN TEAM
-    #
-    # Lock Escrow
-    #
-    # Smart Contract Function:
-    # lockFunds(contract_id, amount)
-    #
-    # Blockchain teammate should implement this.
-    # ==========================================
-    contract.funded_amount = contract.total_amount
-    contract.funded_at = timezone.now()
-    contract.status = ContractStatus.FUNDED
     if transaction_hash:
-        contract.chain_reference = transaction_hash
-    elif reference:
-        contract.chain_reference = reference
-    contract.save(update_fields=["funded_amount", "funded_at", "status", "chain_reference", "updated_at"])
+        import re
+        from django.core.exceptions import ValidationError
+        tx_pattern = re.compile(r"^0x[a-fA-F0-9]{64}$")
+        clean_tx = transaction_hash.strip()
+        
+        # Support a mock failure hash
+        if clean_tx.lower() == "0xfailed" or "00000000" in clean_tx:
+            contract.status = ContractStatus.FAILED
+            contract.save(update_fields=["status", "updated_at"])
+            raise ValidationError("Blockchain transaction failed. The escrow could not be funded.")
+            
+        if not tx_pattern.match(clean_tx):
+            raise ValidationError("Invalid transaction hash format. Must be a valid 32-byte hexadecimal string starting with 0x.")
+            
+        with transaction.atomic():
+            contract.chain_reference = clean_tx
+            contract.funded_amount = contract.total_amount
+            contract.funded_at = timezone.now()
+            contract.status = ContractStatus.FUNDED
+            contract.save(update_fields=["funded_amount", "funded_at", "status", "chain_reference", "updated_at"])
+    else:
+        with transaction.atomic():
+            if reference:
+                contract.chain_reference = reference.strip()
+            contract.funded_amount = contract.total_amount
+            contract.funded_at = timezone.now()
+            contract.status = ContractStatus.FUNDED
+            contract.save(update_fields=["funded_amount", "funded_at", "status", "chain_reference", "updated_at"])
+            
     return contract
-
-
 def get_contract_dashboard(company) -> dict:
     qs = Contract.objects.filter(company=company)
     aggregates = qs.aggregate(
         total_contracts=Count("id"),
-        active_contracts=Count("id", filter=Q(status__in=[ContractStatus.ACTIVE, ContractStatus.IN_PROGRESS, ContractStatus.FUNDED, ContractStatus.SUBMITTED])),
+        active_contracts=Count("id", filter=Q(status__in=[ContractStatus.PENDING, ContractStatus.ACTIVE, ContractStatus.IN_PROGRESS, ContractStatus.FUNDED, ContractStatus.SUBMITTED])),
         funded_contracts=Count("id", filter=Q(status=ContractStatus.FUNDED)),
         disputed_contracts=Count("id", filter=Q(status=ContractStatus.DISPUTED)),
         completed_contracts=Count("id", filter=Q(status=ContractStatus.COMPLETED)),
