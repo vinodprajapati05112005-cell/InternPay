@@ -30,15 +30,18 @@ const fadeUp = {
 };
 
 const statusColors = {
-  DRAFT: 'bg-slate-50 text-slate-700',
-  ACTIVE: 'bg-blue-50 text-blue-700',
-  FUNDED: 'bg-emerald-50 text-emerald-700',
-  IN_PROGRESS: 'bg-indigo-50 text-indigo-700',
-  SUBMITTED: 'bg-amber-50 text-amber-700',
-  DISPUTED: 'bg-rose-50 text-rose-700',
-  COMPLETED: 'bg-violet-50 text-violet-700',
-  CANCELLED: 'bg-slate-100 text-slate-600',
-  ARCHIVED: 'bg-slate-100 text-slate-600',
+  DRAFT: 'bg-slate-50 text-slate-700 border border-slate-200',
+  ACTIVE: 'bg-blue-50 text-blue-700 border border-blue-200',
+  FUNDED: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
+  IN_PROGRESS: 'bg-indigo-50 text-indigo-700 border border-indigo-200',
+  SUBMITTED: 'bg-amber-50 text-amber-700 border border-amber-200',
+  DISPUTED: 'bg-rose-50 text-rose-700 border border-rose-200',
+  COMPLETED: 'bg-violet-50 text-violet-700 border border-violet-200',
+  CANCELLED: 'bg-slate-100 text-slate-600 border border-slate-200',
+  ARCHIVED: 'bg-slate-100 text-slate-600 border border-slate-200',
+  PENDING: 'bg-amber-50 text-amber-700 border border-amber-200',
+  REJECTED: 'bg-rose-50 text-rose-700 border border-rose-200',
+  FAILED: 'bg-red-50 text-red-700 border border-red-200',
 };
 
 const activityIcon = (type) => {
@@ -109,9 +112,10 @@ const CompanyDashboard = () => {
   }, []);
 
   const activeContracts = useMemo(
-    () => contracts.filter((contract) => ['ACTIVE', 'FUNDED', 'IN_PROGRESS', 'SUBMITTED'].includes(contract.status)),
+    () => contracts.filter((contract) => ['ACTIVE', 'FUNDED', 'IN_PROGRESS', 'SUBMITTED', 'PENDING'].includes(contract.status)),
     [contracts],
   );
+
 
   const cards = useMemo(
     () => [

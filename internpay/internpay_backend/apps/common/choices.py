@@ -17,6 +17,9 @@ class VerificationStatus(models.TextChoices):
 
 class ContractStatus(models.TextChoices):
     DRAFT = "DRAFT", "Draft"
+    PENDING = "PENDING", "Pending"
+    REJECTED = "REJECTED", "Rejected"
+    FAILED = "FAILED", "Failed"
     ACTIVE = "ACTIVE", "Active"
     FUNDING_REQUIRED = "FUNDING_REQUIRED", "Funding Required"
     FUNDED = "FUNDED", "Funded"
@@ -27,6 +30,7 @@ class ContractStatus(models.TextChoices):
     CANCELLED = "CANCELLED", "Cancelled"
     ARCHIVED = "ARCHIVED", "Archived"
     EXPIRED = "EXPIRED", "Expired"
+
 
 
 class MilestoneStatus(models.TextChoices):

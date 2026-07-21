@@ -17,10 +17,11 @@ import {
   AlertCircle,
   TrendingUp,
 } from 'lucide-react';
-import { studentApi } from '../../services/api';
+import { studentApi, contractApi } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { formatCurrency, formatDate, humanizeEnum, daysUntil } from '../../utils/formatters';
 import { getUserDisplayName } from '../../utils/navigation';
+
 
 const fadeUp = {
   hidden: { opacity: 0, y: 20 },
@@ -41,6 +42,12 @@ const getStatusBadge = (status) => {
   switch (status) {
     case 'FUNDED':
       return 'bg-emerald-100 text-emerald-700';
+    case 'PENDING':
+      return 'bg-amber-100 text-amber-700 border border-amber-200';
+    case 'REJECTED':
+      return 'bg-rose-100 text-rose-700 border border-rose-200';
+    case 'FAILED':
+      return 'bg-red-100 text-red-700 border border-red-200';
     case 'ACTIVE':
     case 'IN_PROGRESS':
       return 'bg-blue-100 text-blue-700';
@@ -72,53 +79,78 @@ const StudentDashboard = () => {
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
   const [dashboard, setDashboard] = useState(null);
   const [contracts, setContracts] = useState([]);
   const [payments, setPayments] = useState([]);
+  const [actionLoading, setActionLoading] = useState({});
+
+  const loadDashboard = async (showSpinner = true) => {
+    if (showSpinner) setIsLoading(true);
+    setError('');
+
+    try {
+      const [dashboardData, contractData, paymentData] = await Promise.all([
+        studentApi.dashboard(),
+        studentApi.contracts(),
+        studentApi.payments(),
+      ]);
+
+      setDashboard(dashboardData || {});
+      setContracts(Array.isArray(contractData) ? contractData : []);
+      setPayments(Array.isArray(paymentData) ? paymentData : []);
+    } catch (loadError) {
+      setError(loadError?.message || 'Unable to load the student dashboard.');
+    } finally {
+      if (showSpinner) setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    let cancelled = false;
-
-    const loadDashboard = async () => {
-      setIsLoading(true);
-      setError('');
-
-      try {
-        const [dashboardData, contractData, paymentData] = await Promise.all([
-          studentApi.dashboard(),
-          studentApi.contracts(),
-          studentApi.payments(),
-        ]);
-
-        if (cancelled) {
-          return;
-        }
-
-        setDashboard(dashboardData || {});
-        setContracts(Array.isArray(contractData) ? contractData : []);
-        setPayments(Array.isArray(paymentData) ? paymentData : []);
-      } catch (loadError) {
-        if (!cancelled) {
-          setError(loadError?.message || 'Unable to load the student dashboard.');
-        }
-      } finally {
-        if (!cancelled) {
-          setIsLoading(false);
-        }
-      }
-    };
-
-    void loadDashboard();
-
-    return () => {
-      cancelled = true;
-    };
+    void loadDashboard(true);
   }, []);
+
+  const handleAcceptContract = async (contractId) => {
+    setActionLoading((prev) => ({ ...prev, [contractId]: 'accept' }));
+    setError('');
+    setSuccessMessage('');
+    try {
+      await contractApi.accept(contractId);
+      setSuccessMessage('Contract accepted successfully!');
+      await loadDashboard(false);
+    } catch (err) {
+      setError(err?.message || 'Failed to accept contract.');
+    } finally {
+      setActionLoading((prev) => ({ ...prev, [contractId]: null }));
+    }
+  };
+
+  const handleRejectContract = async (contractId) => {
+    setActionLoading((prev) => ({ ...prev, [contractId]: 'reject' }));
+    setError('');
+    setSuccessMessage('');
+    try {
+      await contractApi.reject(contractId);
+      setSuccessMessage('Contract rejected successfully.');
+      await loadDashboard(false);
+    } catch (err) {
+      setError(err?.message || 'Failed to reject contract.');
+    } finally {
+      setActionLoading((prev) => ({ ...prev, [contractId]: null }));
+    }
+  };
+
+
+  const pendingContracts = useMemo(
+    () => contracts.filter((contract) => contract.status === 'PENDING'),
+    [contracts],
+  );
 
   const activeContracts = useMemo(
     () => contracts.filter((contract) => ['ACTIVE', 'FUNDED', 'IN_PROGRESS', 'SUBMITTED'].includes(contract.status)),
     [contracts],
   );
+
 
   const recentSubmissions = dashboard?.recent_submissions || [];
 
@@ -164,6 +196,12 @@ const StudentDashboard = () => {
         </div>
       )}
 
+      {successMessage && (
+        <div className="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+          {successMessage}
+        </div>
+      )}
+
       {isLoading ? (
         <div className="grid place-items-center min-h-[40vh] text-slate-500">
           Loading dashboard...
@@ -192,7 +230,80 @@ const StudentDashboard = () => {
             ))}
           </div>
 
+          {pendingContracts.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+              className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 mb-8"
+            >
+              <h2 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
+                <FileText className="w-5 h-5 text-indigo-600 animate-pulse" />
+                Contracts Received
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {pendingContracts.map((contract) => (
+                  <div key={contract.id} className="p-4 rounded-xl border border-slate-100 hover:border-indigo-200 hover:bg-indigo-50/20 transition-all flex flex-col justify-between">
+                    <div>
+                      <div className="flex justify-between items-start mb-2">
+                        <div>
+                          <h3 className="font-bold text-slate-900">{contract.title}</h3>
+                          <p className="text-sm text-slate-500">{contract.company_name || 'Company'}</p>
+                        </div>
+                        <span className="font-extrabold text-slate-900 text-lg">{formatCurrency(contract.total_amount || 0)}</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-xs text-slate-500 mb-4 mt-3">
+                        <div>
+                          <span className="font-medium text-slate-400">Created:</span> {formatDate(contract.created_at)}
+                        </div>
+                        <div>
+                          <span className="font-medium text-slate-400">Deadline:</span> {formatDate(contract.deadline)}
+                        </div>
+                        <div className="col-span-2">
+                          <span className="font-medium text-slate-400">Status:</span>{' '}
+                          <span className={`px-2 py-0.5 rounded-full text-2xs font-semibold ${getStatusBadge(contract.status)}`}>
+                            {humanizeEnum(contract.status)}
+                          </span>
+                        </div>
+                        {contract.chain_reference && (
+                          <div className="col-span-2 truncate">
+                            <span className="font-medium text-slate-400">Ref:</span> {contract.chain_reference}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex gap-2 mt-2">
+                      <button
+                        onClick={() => handleAcceptContract(contract.id)}
+                        disabled={actionLoading[contract.id]}
+                        className="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold shadow transition-colors flex items-center justify-center gap-1.5 disabled:opacity-60"
+                      >
+                        {actionLoading[contract.id] === 'accept' ? (
+                          <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          'Accept'
+                        )}
+                      </button>
+                      <button
+                        onClick={() => handleRejectContract(contract.id)}
+                        disabled={actionLoading[contract.id]}
+                        className="flex-1 px-4 py-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 disabled:opacity-60"
+                      >
+                        {actionLoading[contract.id] === 'reject' ? (
+                          <span className="w-3.5 h-3.5 border-2 border-slate-600 border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          'Reject'
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          )}
+
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}

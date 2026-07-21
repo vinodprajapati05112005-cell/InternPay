@@ -14,6 +14,10 @@ import {
   Shield,
   Zap,
   Eye,
+  UserPlus,
+  X,
+  Loader2,
+  Send,
 } from 'lucide-react';
 import { contractApi } from '../../services/api';
 import { formatCurrency, formatDate, humanizeEnum } from '../../utils/formatters';
@@ -27,6 +31,9 @@ const statusColors = {
   DISPUTED: 'bg-rose-50 text-rose-700 border-rose-200',
   CANCELLED: 'bg-slate-100 text-slate-600 border-slate-200',
   DRAFT: 'bg-slate-50 text-slate-600 border-slate-200',
+  PENDING: 'bg-amber-50 text-amber-700 border border-amber-200',
+  REJECTED: 'bg-rose-50 text-rose-700 border border-rose-200',
+  FAILED: 'bg-red-50 text-red-700 border border-red-200',
 };
 
 const milestoneTimeline = ['Created', 'Funded', 'Work Submitted', 'AI Evaluation', 'Dispute Window', 'Released'];
@@ -36,6 +43,39 @@ const CompanyContractDetails = () => {
   const [contract, setContract] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  const [studentInput, setStudentInput] = useState('');
+  const [isAssigning, setIsAssigning] = useState(false);
+  const [assignError, setAssignError] = useState('');
+  const [assignSuccess, setAssignSuccess] = useState('');
+
+  const reloadContract = async () => {
+    try {
+      const data = await contractApi.detail(id);
+      setContract(data || null);
+    } catch {}
+  };
+
+  const handleAssignStudent = async (e) => {
+    e.preventDefault();
+    if (!studentInput.trim()) {
+      setAssignError('Please enter a student email, profile ID, or wallet address.');
+      return;
+    }
+    setIsAssigning(true);
+    setAssignError('');
+    try {
+      await contractApi.assignStudent(id, { student_id: studentInput.trim() });
+      setAssignSuccess('Student assigned successfully! Contract proposal converted to Pending and sent.');
+      setShowAssignModal(false);
+      setStudentInput('');
+      await reloadContract();
+    } catch (err) {
+      setAssignError(err?.message || 'Failed to assign student to contract.');
+    } finally {
+      setIsAssigning(false);
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -108,11 +148,21 @@ const CompanyContractDetails = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 p-4 sm:p-6 lg:p-8">
+    <div className="min-h-screen bg-slate-50 p-4 sm:p-6 lg:p-8 font-inter">
       <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
         <Link to="/company/contracts" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-blue-600 font-medium mb-3 transition-colors">
           <ArrowLeft className="w-4 h-4" /> Back to Contracts
         </Link>
+
+        {assignSuccess && (
+          <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700 flex items-center justify-between">
+            <span>{assignSuccess}</span>
+            <button onClick={() => setAssignSuccess('')} className="text-emerald-500 hover:text-emerald-700">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-3 flex-wrap">
@@ -123,14 +173,24 @@ const CompanyContractDetails = () => {
             </div>
             <p className="text-slate-500 mt-1">{contract.id}</p>
           </div>
-          {['ACTIVE', 'FUNDED', 'IN_PROGRESS'].includes(contract.status) && (
-            <Link
-              to={`/company/contracts/${contract.id}/fund`}
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl font-semibold text-sm hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg"
-            >
-              <Lock className="w-4 h-4" /> Fund Contract
-            </Link>
-          )}
+          <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+            {(contract.status === 'DRAFT' || !contract.student) && (
+              <button
+                onClick={() => setShowAssignModal(true)}
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white hover:bg-indigo-700 rounded-xl font-semibold text-sm transition-all shadow-lg"
+              >
+                <UserPlus className="w-4 h-4" /> Assign Student & Send Proposal
+              </button>
+            )}
+            {contract.status === 'ACTIVE' && (
+              <Link
+                to={`/company/contracts/${contract.id}/fund`}
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl font-semibold text-sm hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg"
+              >
+                <Lock className="w-4 h-4" /> Fund Contract
+              </Link>
+            )}
+          </div>
         </div>
       </motion.div>
 
@@ -281,6 +341,73 @@ const CompanyContractDetails = () => {
           )}
         </div>
       </motion.div>
+
+      {showAssignModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white rounded-2xl border border-slate-200 p-6 max-w-md w-full shadow-2xl space-y-4 font-inter"
+          >
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                <UserPlus className="w-5 h-5 text-indigo-600" />
+                Assign Student to Contract
+              </h3>
+              <button onClick={() => setShowAssignModal(false)} className="text-slate-400 hover:text-slate-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <p className="text-sm text-slate-500">
+              Enter the student's email address, profile ID, or wallet address. This will convert the draft contract into a Pending proposal and send it to the student.
+            </p>
+
+            {assignError && (
+              <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700">
+                {assignError}
+              </div>
+            )}
+
+            <form onSubmit={handleAssignStudent} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
+                  Student Email / Profile ID / Wallet
+                </label>
+                <input
+                  type="text"
+                  value={studentInput}
+                  onChange={(e) => setStudentInput(e.target.value)}
+                  placeholder="e.g. student@example.com or 0x..."
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAssignModal(false)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-sm font-semibold transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isAssigning}
+                  className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold shadow transition-colors flex items-center gap-2 disabled:opacity-60"
+                >
+                  {isAssigning ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Send className="w-4 h-4" />
+                  )}
+                  Assign & Send Proposal
+                </button>
+              </div>
+            </form>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 };

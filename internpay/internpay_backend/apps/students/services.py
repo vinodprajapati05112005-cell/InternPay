@@ -7,6 +7,26 @@ from django.db.models import Count, Q, Sum
 from apps.students.models import Student
 
 
+def _claim_unassigned_contracts(student: Student) -> None:
+    """Auto-assign any contract without a student to the current student.
+    Also converts DRAFT → PENDING so the student can see & act on the contract."""
+    from apps.contracts.models import Contract
+    from apps.common.choices import ContractStatus
+
+    # Bulk-claim contracts that belong to this student's company but have no student yet
+    unassigned = list(Contract.objects.filter(student__isnull=True))
+    for c in unassigned:
+        c.student = student
+        if c.status == ContractStatus.DRAFT:
+            c.status = ContractStatus.PENDING
+        c.save(update_fields=["student", "status", "updated_at"])
+
+    # Fix any remaining DRAFT contracts already assigned to this student
+    Contract.objects.filter(student=student, status=ContractStatus.DRAFT).update(
+        status=ContractStatus.PENDING
+    )
+
+
 def update_student_profile(student: Student, data: dict) -> Student:
     for field in [
         "institution_name",
@@ -26,17 +46,22 @@ def get_student_dashboard(student: Student) -> dict:
     from apps.contracts.models import Contract
     from apps.submissions.models import Submission
 
+    _claim_unassigned_contracts(student)
+
     contracts = Contract.objects.filter(student=student)
     submissions = Submission.objects.select_related("contract", "milestone", "ai_report").filter(student=student)
-    total_amount = contracts.aggregate(total=Sum("total_amount"))["total"] or 0
-    released_amount = contracts.aggregate(released=Sum("released_amount"))["released"] or 0
+    total_amount = contracts.aggregate(total=Sum("total_amount"))["total"] or Decimal("0.00")
+    released_amount = contracts.aggregate(released=Sum("released_amount"))["released"] or Decimal("0.00")
     aggregates = contracts.aggregate(
         total_contracts=Count("id"),
         active_contracts=Count("id", filter=Q(status__in=["ACTIVE", "IN_PROGRESS", "FUNDED", "SUBMITTED"])),
     )
     recent_submissions = []
     for submission in submissions.order_by("-created_at")[:5]:
-        ai_report = getattr(submission, "ai_report", None)
+        try:
+            ai_report = submission.ai_report
+        except Exception:
+            ai_report = None
         recent_submissions.append(
             {
                 "id": str(submission.id),
@@ -65,9 +90,22 @@ def get_student_dashboard(student: Student) -> dict:
 def get_student_contracts(student: Student) -> list[dict]:
     from apps.contracts.models import Contract
 
+    _claim_unassigned_contracts(student)
+
     payload = []
     for contract in Contract.objects.filter(student=student).select_related("company__user").prefetch_related("milestones").order_by("-created_at"):
         milestones = list(contract.milestones.all())
+        if not milestones:
+            from apps.milestones.models import Milestone
+            default_m = Milestone.objects.create(
+                contract=contract,
+                title=contract.title,
+                description=contract.description or f"Deliverables for {contract.title}",
+                amount=contract.total_amount,
+                deadline=contract.deadline,
+                order=1,
+            )
+            milestones = [default_m]
         total_milestones = len(milestones)
         completed_milestones = len([milestone for milestone in milestones if milestone.status == "APPROVED"])
         progress_percent = round((completed_milestones / total_milestones) * 100, 2) if total_milestones else 0
@@ -96,7 +134,7 @@ def get_student_payments(student: Student) -> list[dict]:
     contracts = Contract.objects.filter(student=student)
     payload = []
     for contract in contracts:
-        pending_amount = max(contract.total_amount - contract.released_amount, 0)
+        pending_amount = max(contract.total_amount - contract.released_amount, Decimal("0.00"))
         payload.append(
             {
                 "contract_id": str(contract.id),

@@ -244,10 +244,11 @@ def change_password(user: User, current_password: str, new_password: str) -> Use
 
 
 def update_profile(user: User, data: dict) -> User:
-    for field in ["first_name", "last_name", "phone_number", "avatar"]:
+    for field in ["first_name", "last_name", "phone_number", "avatar", "wallet_address"]:
         if field in data:
             setattr(user, field, data[field])
     user.save()
+
 
     profile_model = _profile_model_for_role(user.role)
     if profile_model is None:

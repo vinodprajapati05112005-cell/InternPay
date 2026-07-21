@@ -37,7 +37,12 @@ class SubmissionViewSet(viewsets.ModelViewSet):
         if user.role == UserRole.COMPANY:
             return qs.filter(contract__company__user=user)
         if user.role == UserRole.JUDGE:
-            return qs.filter(contract__judge__user=user)
+            from django.db.models import Q
+            return qs.filter(
+                Q(contract__judge__user=user) |
+                Q(dispute__assigned_judge__user=user) |
+                Q(contract__disputes__assigned_judge__user=user)
+            ).distinct()
         return qs.none()
 
     def list(self, request, *args, **kwargs):

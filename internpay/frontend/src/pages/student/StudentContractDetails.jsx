@@ -20,12 +20,17 @@ import { contractApi } from '../../services/api';
 import { daysUntil, formatCurrency, formatDate, humanizeEnum } from '../../utils/formatters';
 
 const statusColors = {
-  ACTIVE: 'bg-blue-100 text-blue-700',
-  FUNDED: 'bg-emerald-100 text-emerald-700',
-  IN_PROGRESS: 'bg-indigo-100 text-indigo-700',
-  COMPLETED: 'bg-green-100 text-green-700',
-  DISPUTED: 'bg-red-100 text-red-700',
-  SUBMITTED: 'bg-amber-100 text-amber-700',
+  PENDING: 'bg-amber-100 text-amber-700 border border-amber-200',
+  REJECTED: 'bg-rose-100 text-rose-700 border border-rose-200',
+  FAILED: 'bg-red-100 text-red-700 border border-red-200',
+  ACTIVE: 'bg-blue-100 text-blue-700 border border-blue-200',
+  FUNDED: 'bg-emerald-100 text-emerald-700 border border-emerald-200',
+  IN_PROGRESS: 'bg-indigo-100 text-indigo-700 border border-indigo-200',
+  COMPLETED: 'bg-green-100 text-green-700 border border-green-200',
+  DISPUTED: 'bg-red-100 text-red-700 border border-red-200',
+  SUBMITTED: 'bg-amber-100 text-amber-700 border border-amber-200',
+  CANCELLED: 'bg-slate-100 text-slate-600 border border-slate-200',
+  DRAFT: 'bg-slate-100 text-slate-500 border border-slate-200',
 };
 
 const StudentContractDetails = () => {
@@ -33,6 +38,33 @@ const StudentContractDetails = () => {
   const [contract, setContract] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [actionLoading, setActionLoading] = useState(false);
+
+  const handleAccept = async () => {
+    setActionLoading(true);
+    setError('');
+    try {
+      const data = await contractApi.accept(id);
+      setContract(data || null);
+    } catch (err) {
+      setError(err?.message || 'Failed to accept contract.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleReject = async () => {
+    setActionLoading(true);
+    setError('');
+    try {
+      const data = await contractApi.reject(id);
+      setContract(data || null);
+    } catch (err) {
+      setError(err?.message || 'Failed to reject contract.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -64,12 +96,19 @@ const StudentContractDetails = () => {
     };
   }, [id]);
 
+
   const milestones = contract?.milestones || [];
   const completedMilestones = contract?.completed_milestones ?? milestones.filter((milestone) => milestone.status === 'APPROVED').length;
   const totalMilestones = contract?.milestone_count ?? milestones.length;
   const progress = contract?.progress_percent ?? (totalMilestones ? Math.round((completedMilestones / totalMilestones) * 100) : 0);
 
-  const canSubmit = (status) => ['PENDING', 'SUBMITTED', 'UNDER_REVIEW', 'APPROVED', 'REJECTED'].includes(status) || ['ACTIVE', 'FUNDED', 'IN_PROGRESS', 'SUBMITTED'].includes(status);
+  // A milestone can be submitted when the contract is active and the milestone is not already approved
+  const canSubmitMilestone = (milestoneStatus) =>
+    ['PENDING', 'REJECTED'].includes(milestoneStatus);
+
+  // Contract statuses that allow work submission
+  const contractAllowsSubmit = (status) =>
+    ['ACTIVE', 'FUNDED', 'IN_PROGRESS', 'SUBMITTED'].includes(status);
 
   const getMilestoneIcon = (status) => {
     switch (status) {
@@ -120,6 +159,98 @@ const StudentContractDetails = () => {
           Back to Contracts
         </Link>
       </motion.div>
+
+      {error && (
+        <div className="mb-6 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
+
+      {contract.status === 'PENDING' && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-6 bg-gradient-to-r from-indigo-50 to-blue-50 border border-indigo-100 rounded-2xl p-5 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center shrink-0">
+              <FileText className="w-5 h-5 text-indigo-600 animate-pulse" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-slate-900">Contract Proposal Received</h3>
+              <p className="text-sm text-slate-500">Please review the milestones and requirements below. Accept the contract to start working.</p>
+            </div>
+          </div>
+          <div className="flex gap-2 w-full sm:w-auto shrink-0">
+            <button
+              onClick={handleAccept}
+              disabled={actionLoading}
+              className="flex-1 sm:flex-none px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold shadow-md transition-colors flex items-center justify-center gap-1.5 disabled:opacity-60"
+            >
+              {actionLoading ? (
+                <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                'Accept Contract'
+              )}
+            </button>
+            <button
+              onClick={handleReject}
+              disabled={actionLoading}
+              className="flex-1 sm:flex-none px-6 py-2.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl text-sm font-semibold transition-colors flex items-center justify-center gap-1.5 disabled:opacity-60"
+            >
+              {actionLoading ? (
+                <span className="w-4 h-4 border-2 border-slate-600 border-t-transparent rounded-full animate-spin" />
+              ) : (
+                'Reject'
+              )}
+            </button>
+          </div>
+        </motion.div>
+      )}
+
+      {contract.status === 'FUNDED' && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-6 bg-gradient-to-r from-emerald-50 to-green-50 border border-emerald-200 rounded-2xl p-5 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center shrink-0">
+              <Shield className="w-5 h-5 text-emerald-600" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-slate-900">Escrow Funded — Ready to Work!</h3>
+              <p className="text-sm text-slate-500">The company has locked payment in escrow. You can now submit work for each milestone below.</p>
+            </div>
+          </div>
+          <Link
+            to={`/student/contracts/${contract.id}/submit`}
+            className="shrink-0 px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-semibold shadow-md transition-colors flex items-center gap-2"
+          >
+            <Send className="w-4 h-4" /> Submit Work
+          </Link>
+        </motion.div>
+      )}
+
+      {contract.status === 'ACTIVE' && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl p-5 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center shrink-0">
+              <Zap className="w-5 h-5 text-blue-600" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-slate-900">Contract Active — Waiting for Company to Fund Escrow</h3>
+              <p className="text-sm text-slate-500">You accepted this contract. Work will begin once the company funds the escrow payment.</p>
+            </div>
+          </div>
+        </motion.div>
+      )}
+
 
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 mb-6">
         <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
@@ -210,13 +341,15 @@ const StudentContractDetails = () => {
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="bg-white rounded-2xl border border-slate-200 shadow-sm">
         <div className="p-6 border-b border-slate-100 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-slate-900">Milestones & Deliverables</h2>
-          <Link
-            to={`/student/contracts/${contract.id}/submit`}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl font-semibold text-sm hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg"
-          >
-            <Send className="w-4 h-4" />
-            Submit Work
-          </Link>
+          {contractAllowsSubmit(contract.status) && (
+            <Link
+              to={`/student/contracts/${contract.id}/submit`}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl font-semibold text-sm hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg"
+            >
+              <Send className="w-4 h-4" />
+              Submit Work
+            </Link>
+          )}
         </div>
         <div className="divide-y divide-slate-100">
           {milestones.map((milestone, index) => {
@@ -260,7 +393,7 @@ const StudentContractDetails = () => {
 
                     <p className="text-sm text-slate-600 whitespace-pre-wrap">{milestone.description}</p>
 
-                    {canSubmit(milestone.status) && (
+                    {contractAllowsSubmit(contract.status) && canSubmitMilestone(milestone.status) && (
                       <div className="mt-4 flex flex-wrap gap-2">
                         <Link
                           to={`/student/contracts/${contract.id}/submit`}

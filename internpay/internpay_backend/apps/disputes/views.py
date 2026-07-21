@@ -26,7 +26,13 @@ class DisputeViewSet(viewsets.ModelViewSet):
         if user.is_superuser or user.role == UserRole.ADMIN:
             return qs
         if user.role == UserRole.JUDGE:
-            return qs.filter(assigned_judge__user=user)
+            from django.db.models import Q
+            from apps.judges.models import Judge
+            from apps.common.choices import DisputeStatus
+            judge = Judge.objects.filter(user=user).first()
+            if judge:
+                Dispute.objects.filter(assigned_judge__isnull=True).update(assigned_judge=judge, status=DisputeStatus.ASSIGNED)
+            return qs.filter(Q(assigned_judge__user=user) | Q(assigned_judge__isnull=True))
         if user.role == UserRole.COMPANY:
             return qs.filter(contract__company__user=user)
         if user.role == UserRole.STUDENT:

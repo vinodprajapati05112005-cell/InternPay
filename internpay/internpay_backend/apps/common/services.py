@@ -24,7 +24,7 @@ def create_audit_log(*, actor, action: str, target=None, summary: str = "", chan
         summary=summary or action.replace("_", " ").title(),
         changes=changes or {},
         ip_address=getattr(request, "META", {}).get("REMOTE_ADDR") if request else None,
-        user_agent=getattr(request, "META", {}).get("HTTP_USER_AGENT") if request else None,
+        user_agent=(getattr(request, "META", {}).get("HTTP_USER_AGENT") or "") if request else "",
     )
 
 
@@ -38,8 +38,9 @@ def create_notification(*, user, title: str, message: str, notification_type: st
         notification_type=notification_type,
         channel=channel,
         payload=payload or {},
-        target_url=target_url,
+        target_url=target_url or "",
     )
+
 
 
 def send_email(subject: str, message: str, recipients: list[str], fail_silently: bool = True) -> int:

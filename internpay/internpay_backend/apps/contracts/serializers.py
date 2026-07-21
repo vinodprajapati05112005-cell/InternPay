@@ -29,7 +29,7 @@ class ContractMilestoneInputSerializer(serializers.Serializer):
 
 class ContractWriteSerializer(BaseModelSerializer):
     milestones = ContractMilestoneInputSerializer(many=True, required=False)
-    student_id = serializers.UUIDField(required=False, allow_null=True)
+    student_id = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     judge_id = serializers.UUIDField(required=False, allow_null=True)
 
     class Meta:
@@ -176,7 +176,19 @@ class ContractDetailSerializer(BaseModelSerializer):
         return judge.judge_display_name or judge.user.get_full_name() or judge.user.email
 
     def get_milestones(self, obj):
-        return ContractMilestoneSummarySerializer(obj.milestones.all().order_by("order"), many=True).data
+        qs = obj.milestones.all().order_by("order")
+        if not qs.exists():
+            from apps.milestones.models import Milestone
+            Milestone.objects.create(
+                contract=obj,
+                title=obj.title,
+                description=obj.description or f"Deliverables for {obj.title}",
+                amount=obj.total_amount,
+                deadline=obj.deadline,
+                order=1,
+            )
+            qs = obj.milestones.all().order_by("order")
+        return ContractMilestoneSummarySerializer(qs, many=True).data
 
     def get_milestone_count(self, obj):
         return obj.milestones.count()
@@ -204,7 +216,7 @@ class ContractDashboardSerializer(serializers.Serializer):
 
 
 class ContractAssignStudentSerializer(serializers.Serializer):
-    student_id = serializers.UUIDField()
+    student_id = serializers.CharField()
 
 
 class ContractAddMilestonesSerializer(serializers.Serializer):
