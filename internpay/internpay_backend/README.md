@@ -7,28 +7,34 @@ Production-oriented Django backend for the InternPay hackathon project.
 - Python 3.12+ compatible
 - Django 6
 - Django REST Framework
-- SQLite
+- SQLite for local development
 - JWT authentication via SimpleJWT
 - Swagger via drf-yasg
 - CORS via django-cors-headers
-- OpenAI-powered AI evaluation with a local fallback
+- Gemini-powered AI evaluation with a deterministic local fallback
+- WhiteNoise for production static files
 
 ## Project Layout
 
 - `internpay/` project settings, URLs, WSGI/ASGI, and shared utilities
 - `apps/` domain apps for users, companies, students, judges, contracts, milestones, submissions, AI, disputes, and notifications
 - `media/uploads/` file storage for submissions and evidence
+- `build.sh` Render build script
+- `start.sh` Render start script
+- `render.yaml` Render Blueprint
 - `docs/` deployment notes and future docs
 
 ## Quick Start
 
-1. Build the React app once so Django can serve it:
+1. Build the React app whenever frontend source changes so Django can serve the latest `frontend/dist` build:
 
 ```bash
 cd ../frontend
 npm install
 npm run build
 ```
+
+The generated `frontend/dist` folder is part of the deployable source for this project, so keep it in sync with frontend changes before you deploy.
 
 2. Create and activate a virtual environment, then install backend dependencies:
 
@@ -92,44 +98,42 @@ The Django app now serves:
 - Judge resolves disputes.
 - Blockchain integration is intentionally left as TODO placeholders for the teammate who owns on-chain execution.
 
-## PythonAnywhere Deployment
+## Render Deployment
 
-Deploy everything as one Python web application. Do not create a second Node or React service, and do not run `npm run dev` in production.
+Deploy everything as one Python web application plus one Render Postgres database.
 
-Django serves the React production build from `frontend/dist`, together with the API, static files, and media files.
-
-1. Build the React frontend locally or in your deployment workspace:
-
-```bash
-cd TrustBite/internpay/frontend
-npm install
-npm run build
-```
-
-2. Copy or upload the generated `frontend/dist` folder together with the Django backend code.
-3. On PythonAnywhere, create one Python web app and point its WSGI file at `internpay.wsgi.application`.
-4. Create a virtualenv, install requirements, and set the environment variables from `.env.example`.
-5. Run the Django setup commands once:
+1. Make sure the frontend build output exists in `frontend/dist` before you deploy. If you change the frontend source, rerun `npm run build` in `frontend/`.
+2. Create a Render web service from this repository and use these commands:
 
 ```bash
-cd TrustBite/internpay/internpay_backend
-python manage.py makemigrations
-python manage.py migrate
-python manage.py collectstatic
+Build Command: bash build.sh
+Start Command: bash start.sh
 ```
 
-6. Reload the same web app after any frontend rebuild.
+3. Add a Render Postgres database and set `DATABASE_URL` from it.
+4. Set these environment variables on the web service:
 
-In the PythonAnywhere web app config:
+- `SECRET_KEY` - required, generate a strong random value
+- `GEMINI_API_KEY` - required, your Gemini API key
+- `GEMINI_MODEL` - recommended, use `gemini-2.5-flash`
+- `PYTHON_VERSION` - recommended, pin a version such as `3.13.5`
 
-- Set the working directory to the backend root.
-- Point the WSGI file at `internpay.wsgi.application`.
-- No separate frontend app is needed.
-- Ensure `ALLOWED_HOSTS` includes your PythonAnywhere domain.
+5. Optional environment variables:
+
+- `SITE_URL` - override the backend public URL if you are not using the Render-generated one
+- `FRONTEND_URL` - override the frontend URL if you host it separately
+- `CORS_ALLOWED_ORIGINS` - only needed when the frontend is on a different origin
+- `CSRF_TRUSTED_ORIGINS` - only needed when the frontend is on a different origin or custom domain
+- `DEFAULT_FROM_EMAIL`, `EMAIL_BACKEND`, `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `EMAIL_USE_TLS` - only needed if you want SMTP email delivery
+- `MEDIA_ROOT` - set this if you attach a persistent disk for uploads on a paid Render plan
+
+Render automatically provides `RENDER_EXTERNAL_URL` and `RENDER_EXTERNAL_HOSTNAME`, so you do not need to set them yourself.
+
+If you need submission uploads or evidence files to persist across deploys, attach a persistent disk on a paid Render plan and point `MEDIA_ROOT` at that mount path. The free tier uses an ephemeral filesystem.
 
 ## Notes
 
 - SQLite is used by default for easy deployment and hackathon portability.
-- OpenAI is optional. If `OPENAI_API_KEY` is not set, the backend uses a deterministic fallback evaluator so the app still works end to end.
+- Gemini is optional in the sense that the backend falls back to a deterministic heuristic report when the Gemini API is unavailable.
 - The blockchain handoff points are left as clear TODO comments inside the relevant services.
-- Frontend routes are handled by Django, so `/`, `/login`, `/dashboard`, and similar paths all return the React `index.html` shell.
+- Frontend routes are handled by Django, so `/`, `/login`, `/dashboard`, and similar paths all return the React `index.html` shell when `frontend/dist` is present.
