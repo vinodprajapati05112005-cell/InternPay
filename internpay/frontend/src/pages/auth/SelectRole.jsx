@@ -15,6 +15,7 @@ import {
   Star,
   FileCheck,
 } from 'lucide-react';
+import { getStoredWalletSession, shortenWalletAddress } from '../../utils/wallet';
 
 const roles = [
   {
@@ -93,6 +94,7 @@ const item = {
 
 const SelectRole = () => {
   const [selected, setSelected] = useState(null);
+  const [walletSession] = useState(() => getStoredWalletSession());
 
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4 py-12">
@@ -137,6 +139,7 @@ const SelectRole = () => {
           {roles.map((role) => {
             const Icon = role.icon;
             const isSelected = selected === role.id;
+            const walletSuffix = walletSession?.address ? `&wallet=${encodeURIComponent(walletSession.address)}` : '';
 
             return (
               <motion.div
@@ -189,7 +192,7 @@ const SelectRole = () => {
 
                   {/* CTA Button */}
                   <Link
-                    to={role.link}
+                    to={`${role.link}${walletSuffix}`}
                     className={`w-full py-3 bg-gradient-to-r ${role.gradient} text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2 group-hover:gap-3`}
                   >
                     Get Started
@@ -211,10 +214,21 @@ const SelectRole = () => {
           <div className="inline-flex items-center gap-2 px-4 py-2 bg-white rounded-full border border-slate-200 shadow-sm">
             <CheckCircle2 className="w-4 h-4 text-green-500" />
             <span className="text-sm text-slate-500">
-              Wallet connected:{' '}
-              <code className="text-slate-900 font-mono text-xs bg-slate-100 px-1.5 py-0.5 rounded">
-                0x7a23...9F21
-              </code>
+              {walletSession?.address ? (
+                <>
+                  Wallet connected:{' '}
+                  <code className="text-slate-900 font-mono text-xs bg-slate-100 px-1.5 py-0.5 rounded">
+                    {shortenWalletAddress(walletSession.address)}
+                  </code>
+                </>
+              ) : (
+                <>
+                  No wallet connected yet.{' '}
+                  <Link to="/connect-wallet" className="text-blue-600 hover:text-blue-700 font-semibold">
+                    Connect a wallet
+                  </Link>
+                </>
+              )}
             </span>
           </div>
         </motion.div>

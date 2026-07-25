@@ -8,6 +8,7 @@ import {
   Eye,
   EyeOff,
   UserPlus,
+  Wallet,
   Loader2,
   AlertCircle,
   ArrowRight,
@@ -18,6 +19,7 @@ import {
   Scale,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { getStoredWalletSession } from '../../utils/wallet';
 
 const roleOptions = [
   {
@@ -87,6 +89,7 @@ const initialForm = {
   specialization: '',
   years_experience: '',
   license_number: '',
+  wallet_address: '',
 };
 
 const Register = () => {
@@ -119,6 +122,22 @@ const Register = () => {
       setRole(normalized);
     }
   }, [queryRole]);
+
+  useEffect(() => {
+    const queryWallet = searchParams.get('wallet');
+    const storedWallet = getStoredWalletSession()?.address || '';
+    const nextWalletAddress = queryWallet || storedWallet;
+
+    if (!nextWalletAddress) {
+      return;
+    }
+
+    setForm((prev) => (
+      prev.wallet_address
+        ? prev
+        : { ...prev, wallet_address: nextWalletAddress }
+    ));
+  }, [searchParams]);
 
   const passwordChecks = useMemo(() => {
     return {
@@ -252,6 +271,8 @@ const Register = () => {
       payload.license_number = form.license_number.trim();
       payload.bio = form.bio.trim();
     }
+
+    payload.wallet_address = form.wallet_address.trim();
 
     return payload;
   };
@@ -571,6 +592,27 @@ const Register = () => {
                 placeholder="+1 555 123 4567"
                 className="w-full px-4 py-3 rounded-xl border border-slate-200 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
               />
+            </div>
+
+            <div>
+              <label htmlFor="wallet_address" className="block text-sm font-semibold text-slate-700 mb-1.5">
+                Wallet Address
+              </label>
+              <div className="relative">
+                <Wallet className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                <input
+                  id="wallet_address"
+                  name="wallet_address"
+                  type="text"
+                  value={form.wallet_address}
+                  onChange={handleChange}
+                  placeholder="0x..."
+                  className="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-200 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-mono"
+                />
+              </div>
+              <p className="mt-1 text-xs text-slate-400">
+                If you connected a wallet first, it will be prefilled here automatically.
+              </p>
             </div>
 
             <div className="space-y-4 pt-2">

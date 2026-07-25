@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
@@ -148,8 +148,6 @@ const StudentContractDetails = () => {
       </div>
     );
   }
-
-  const activeMilestones = milestones.filter((milestone) => canSubmit(milestone.status));
 
   return (
     <div className="min-h-screen bg-slate-50 p-4 sm:p-6 lg:p-8">
