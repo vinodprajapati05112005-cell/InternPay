@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Build React frontend
-cd frontend
+cd internpay/frontend
 npm install
 npm run build
 
