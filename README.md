@@ -9,14 +9,12 @@ InternPay is a blockchain-powered escrow platform designed to eliminate payment 
 ## 🔗 Live Demo
 
 🚀 **Live Website:** [https://internpay.onrender.com/]
+## Contributors
 
-## 👥 Contributors
-
-* **Vinod**
-* **Tannu**
-* **Het**
-* **Saloni**
-
+- [Vinod Prajapati](https://github.com/vinodprajapati05112005-cell)
+- [Tannu](https://github.com/tannu6)
+- [Saloni](https://github.com/ErSaloniAi)
+- [Het Bharodiya](https://github.com/hetbharodiya)
 ---
 
 ## 🚀 Features
