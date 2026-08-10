@@ -1,4 +1,5 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
+const REQUEST_TIMEOUT_MS = 10_000;
 const AUTH_STORAGE_KEY = 'internpay_auth';
 
 class ApiError extends Error {
@@ -132,12 +133,26 @@ export const request = async (
     }
   }
 
-  const response = await fetch(buildUrl(path), {
-    method,
-    headers: requestHeaders,
-    body: data === undefined || data === null ? undefined : isFormData ? data : JSON.stringify(data),
-    credentials: 'same-origin',
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+  let response;
+  try {
+    response = await fetch(buildUrl(path), {
+      method,
+      headers: requestHeaders,
+      body: data === undefined || data === null ? undefined : isFormData ? data : JSON.stringify(data),
+      credentials: 'same-origin',
+      signal: controller.signal,
+    });
+  } catch (err) {
+    if (err?.name === 'AbortError') {
+      throw new ApiError('Request timed out. The server may be starting up — please try again in a moment.', { status: 0 });
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 
   const payload = await safeJson(response);
 
