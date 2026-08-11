@@ -1,6 +1,9 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 const REQUEST_TIMEOUT_MS = 10_000;
 const AUTH_STORAGE_KEY = 'internpay_auth';
+export const AUTH_SESSION_EVENT = 'internpay:auth-session-changed';
+
+let refreshSessionPromise = null;
 
 class ApiError extends Error {
   constructor(message, { status = 0, errors = null, payload = null } = {}) {
@@ -11,6 +14,54 @@ class ApiError extends Error {
     this.payload = payload;
   }
 }
+
+const extractErrorMessage = (value) => {
+  if (!value) {
+    return '';
+  }
+
+  if (typeof value === 'string') {
+    return value.trim();
+  }
+
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const message = extractErrorMessage(item);
+      if (message) {
+        return message;
+      }
+    }
+    return '';
+  }
+
+  if (typeof value === 'object') {
+    for (const item of Object.values(value)) {
+      const message = extractErrorMessage(item);
+      if (message) {
+        return message;
+      }
+    }
+  }
+
+  return '';
+};
+
+const buildErrorMessage = (payload, response, fallback) => {
+  const nested = extractErrorMessage(payload?.errors) || extractErrorMessage(payload?.error);
+  if (nested) {
+    return nested;
+  }
+
+  if (typeof payload?.message === 'string' && payload.message.trim()) {
+    return payload.message.trim();
+  }
+
+  if (typeof payload?.detail === 'string' && payload.detail.trim()) {
+    return payload.detail.trim();
+  }
+
+  return response?.statusText || fallback;
+};
 
 const buildUrl = (path) => {
   if (!path) return path;
@@ -49,6 +100,7 @@ export const setStoredAuth = (session) => {
   }
 
   window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(session));
+  window.dispatchEvent(new CustomEvent(AUTH_SESSION_EVENT, { detail: session }));
   return session;
 };
 
@@ -58,6 +110,7 @@ export const clearStoredAuth = () => {
   }
 
   window.localStorage.removeItem(AUTH_STORAGE_KEY);
+  window.dispatchEvent(new CustomEvent(AUTH_SESSION_EVENT, { detail: null }));
 };
 
 export const normalizeAuthPayload = (payload) => {
@@ -71,6 +124,10 @@ export const normalizeAuthPayload = (payload) => {
 };
 
 const refreshAccessToken = async () => {
+  if (refreshSessionPromise) {
+    return refreshSessionPromise;
+  }
+
   const stored = getStoredAuth();
   const refreshToken = stored?.refreshToken;
 
@@ -78,32 +135,52 @@ const refreshAccessToken = async () => {
     return null;
   }
 
-  const response = await fetch(buildUrl('/api/auth/refresh/'), {
-    method: 'POST',
-    headers: {
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ refresh_token: refreshToken }),
-  });
+  refreshSessionPromise = (async () => {
+    try {
+      const response = await fetch(buildUrl('/api/auth/refresh/'), {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ refresh_token: refreshToken }),
+      });
 
-  const payload = await safeJson(response);
-  if (!response.ok || payload?.success === false) {
-    throw new ApiError(payload?.message || response.statusText || 'Unable to refresh session', {
-      status: response.status,
-      errors: payload?.errors,
-      payload,
-    });
-  }
+      const payload = await safeJson(response);
+      if (!response.ok || payload?.success === false) {
+        throw new ApiError(buildErrorMessage(payload, response, 'Unable to refresh session'), {
+          status: response.status,
+          errors: payload?.errors,
+          payload,
+        });
+      }
 
-  const tokens = payload?.data ?? payload ?? {};
-  const nextSession = {
-    ...stored,
-    accessToken: tokens.access || tokens.access_token || tokens.accessToken || stored?.accessToken || null,
-    refreshToken: tokens.refresh || tokens.refresh_token || tokens.refreshToken || stored?.refreshToken || null,
-  };
-  setStoredAuth(nextSession);
-  return nextSession;
+      const tokens = payload?.data ?? payload ?? {};
+      const nextSession = {
+        ...stored,
+        accessToken: tokens.access || tokens.access_token || tokens.accessToken || stored?.accessToken || null,
+        refreshToken: tokens.refresh || tokens.refresh_token || tokens.refreshToken || stored?.refreshToken || null,
+      };
+
+      if (!nextSession.accessToken || !nextSession.refreshToken) {
+        throw new ApiError('Unable to refresh session', {
+          status: response.status,
+          errors: payload?.errors,
+          payload,
+        });
+      }
+
+      setStoredAuth(nextSession);
+      return nextSession;
+    } catch (error) {
+      clearStoredAuth();
+      throw error;
+    } finally {
+      refreshSessionPromise = null;
+    }
+  })();
+
+  return refreshSessionPromise;
 };
 
 export const request = async (
@@ -158,21 +235,24 @@ export const request = async (
 
   if (response.status === 401 && auth && retryOnAuthFailure && getStoredAuth()?.refreshToken) {
     try {
-      await refreshAccessToken();
-      return request(path, {
-        method,
-        data,
-        headers,
-        auth,
-        retryOnAuthFailure: false,
-      });
+      const refreshed = await refreshAccessToken();
+      if (refreshed) {
+        return request(path, {
+          method,
+          data,
+          headers,
+          auth,
+          retryOnAuthFailure: false,
+        });
+      }
     } catch {
       clearStoredAuth();
     }
+    clearStoredAuth();
   }
 
   if (!response.ok || payload?.success === false) {
-    throw new ApiError(payload?.message || response.statusText || 'Request failed', {
+    throw new ApiError(buildErrorMessage(payload, response, 'Request failed'), {
       status: response.status,
       errors: payload?.errors || payload?.error || null,
       payload,

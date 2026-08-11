@@ -11,7 +11,7 @@ from django.utils import timezone
 from rest_framework_simplejwt.tokens import RefreshToken as JWTRefreshToken
 
 from apps.common.choices import UserRole
-from apps.common.services import create_notification, send_email
+from apps.common.services import create_notification, run_after_commit, send_email
 from apps.users.models import RefreshToken, User
 from internpay.utils.email import frontend_link
 from internpay.utils.security import get_client_ip, hash_token
@@ -104,15 +104,18 @@ def create_user_account(*, validated_data: dict, request=None) -> tuple[User, di
         profile.save()
 
     tokens = issue_tokens_for_user(user, request=request)
-    send_verification_email(user)
-    create_notification(
-        user=user,
-        title="Welcome to InternPay",
-        message="Your account has been created. Please verify your email to continue.",
-        notification_type="EMAIL_VERIFICATION",
-        channel="BOTH",
-        payload={"role": user.role},
-        target_url=frontend_link("/auth/login"),
+    run_after_commit(lambda: send_verification_email(user), label="verification email")
+    run_after_commit(
+        lambda: create_notification(
+            user=user,
+            title="Welcome to InternPay",
+            message="Your account has been created. Please verify your email to continue.",
+            notification_type="EMAIL_VERIFICATION",
+            channel="BOTH",
+            payload={"role": user.role},
+            target_url=frontend_link("/auth/login"),
+        ),
+        label="welcome notification",
     )
     return user, tokens, profile_data
 

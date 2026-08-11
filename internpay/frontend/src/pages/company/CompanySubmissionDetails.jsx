@@ -127,7 +127,7 @@ const CompanySubmissionDetails = () => {
   }, [id]);
 
   const timeLeft = useMemo(() => {
-    const anchor = submission?.evaluated_at || submission?.submitted_at;
+    const anchor = submission?.submitted_at || submission?.evaluated_at;
     if (!anchor) {
       return null;
     }
@@ -204,6 +204,8 @@ const CompanySubmissionDetails = () => {
   const evaluation = report || submission.ai_report;
   const score = evaluation?.overall_score || submission.ai_score || 0;
   const linkEntries = submission.links || {};
+  const hasEvaluation = Boolean(evaluation);
+  const scoreClass = hasEvaluation ? getScoreColor(score) : 'text-slate-500';
 
   return (
     <div className="min-h-screen bg-slate-50 p-4 sm:p-6 lg:p-8">
@@ -377,10 +379,10 @@ const CompanySubmissionDetails = () => {
             <div className="text-center p-4 bg-amber-50 border border-amber-100 rounded-xl">
               <p className="text-xs text-amber-600 font-medium mb-1">Time Remaining</p>
               <p className="text-2xl font-extrabold text-amber-700">{timeLeft || 'N/A'}</p>
-              <p className="text-xs text-amber-500 mt-1">24-hour window after evaluation</p>
+              <p className="text-xs text-amber-500 mt-1">24-hour window after submission</p>
             </div>
             <p className="text-xs text-slate-500 mt-3">
-              If a dispute is not filed within the window, the contract can proceed to the next step in the workflow.
+              If a dispute is not filed within the window, the contract can proceed to the next review step in the workflow.
             </p>
           </motion.div>
 
@@ -391,12 +393,14 @@ const CompanySubmissionDetails = () => {
             <div className="space-y-3">
               <div className="flex justify-between items-center text-sm">
                 <span className="text-slate-500">AI Score</span>
-                <span className={`font-extrabold ${getScoreColor(score)}`}>{score}/100</span>
+                <span className={`font-extrabold ${scoreClass}`}>
+                  {hasEvaluation ? `${score}/100` : 'Awaiting review'}
+                </span>
               </div>
               <div className="flex justify-between items-center text-sm">
                 <span className="text-slate-500">Recommendation</span>
                 <span className={`px-2 py-0.5 rounded-lg text-xs font-semibold border ${getRecommendationBadge(evaluation?.recommendation)}`}>
-                  {humanizeEnum(evaluation?.recommendation)}
+                  {hasEvaluation ? humanizeEnum(evaluation?.recommendation) : 'Pending'}
                 </span>
               </div>
               <div className="flex justify-between items-center text-sm">

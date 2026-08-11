@@ -1,4 +1,5 @@
 const WALLET_SESSION_KEY = 'internpay_wallet_session';
+const DEFAULT_EXPECTED_CHAIN_ID = '0x66eee';
 
 const NETWORK_NAMES = {
   '0x1': 'Ethereum Mainnet',
@@ -7,7 +8,38 @@ const NETWORK_NAMES = {
   '0x38': 'BNB Smart Chain',
   '0x89': 'Polygon Mainnet',
   '0xa4b1': 'Arbitrum One',
+  '0x66eee': 'Arbitrum Sepolia',
   '0x2105': 'Base Mainnet',
+};
+
+export const normalizeChainId = (chainId) => {
+  const value = String(chainId || '').trim().toLowerCase();
+  if (!value) {
+    return '';
+  }
+
+  if (value.startsWith('0x')) {
+    return value;
+  }
+
+  if (/^\d+$/.test(value)) {
+    return `0x${Number(value).toString(16)}`;
+  }
+
+  return value;
+};
+
+export const getExpectedChainId = () => normalizeChainId(import.meta.env.VITE_CHAIN_ID || DEFAULT_EXPECTED_CHAIN_ID);
+
+export const getExpectedChainLabel = () => NETWORK_NAMES[getExpectedChainId()] || 'Arbitrum Sepolia';
+
+export const isWrongNetwork = (chainId) => {
+  const expected = getExpectedChainId();
+  if (!expected) {
+    return false;
+  }
+
+  return normalizeChainId(chainId) !== expected;
 };
 
 export const getStoredWalletSession = () => {
@@ -54,7 +86,7 @@ export const shortenWalletAddress = (address, prefixLength = 6, suffixLength = 4
 };
 
 export const getChainLabel = (chainId) => {
-  const normalized = String(chainId || '').trim().toLowerCase();
+  const normalized = normalizeChainId(chainId);
   if (!normalized) {
     return 'Unknown network';
   }

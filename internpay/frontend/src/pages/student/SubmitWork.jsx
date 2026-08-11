@@ -107,8 +107,8 @@ const SubmitWork = () => {
         additional_notes: formData.additional_notes.trim(),
       });
 
-      setSuccessMessage('Work submitted successfully. Redirecting to your AI report...');
-      navigate(`/student/submissions/${submission.id}/report`, { replace: true });
+      setSuccessMessage('Work submitted successfully. Redirecting to your submission details...');
+      navigate(`/student/submissions/${submission.id}`, { replace: true });
     } catch (submitError) {
       setErrors({ _form: submitError?.message || 'Unable to submit your work right now.' });
     } finally {
@@ -246,7 +246,7 @@ const SubmitWork = () => {
   const processingSteps = [
     { label: 'Validating links...', icon: Globe },
     { label: 'Submitting to backend...', icon: Send },
-    { label: 'Triggering AI evaluation...', icon: Sparkles },
+    { label: 'Marking submission as submitted...', icon: Sparkles },
   ];
 
   return (
@@ -378,10 +378,10 @@ const SubmitWork = () => {
                   <Loader2 className="w-5 h-5 animate-spin" />
                   Submitting...
                 </>
-              ) : (
+                ) : (
                 <>
                   <Sparkles className="w-5 h-5" />
-                  Submit Work for AI Evaluation
+                  Submit Work
                 </>
               )}
             </button>
@@ -448,7 +448,7 @@ const SubmitWork = () => {
           </div>
 
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-            <h3 className="font-semibold text-slate-900 mb-3">AI Review Flow</h3>
+            <h3 className="font-semibold text-slate-900 mb-3">Submission Flow</h3>
             <div className="space-y-2 text-sm text-slate-600">
               {processingSteps.map((step) => (
                 <div key={step.label} className="flex items-center gap-2">

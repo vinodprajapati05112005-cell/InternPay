@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
+from django.db import transaction
 from django.core.mail import send_mail
+
+logger = logging.getLogger(__name__)
 
 
 def create_audit_log(*, actor, action: str, target=None, summary: str = "", changes: dict | None = None, request=None):
@@ -40,6 +44,16 @@ def create_notification(*, user, title: str, message: str, notification_type: st
         payload=payload or {},
         target_url=target_url or "",
     )
+
+
+def run_after_commit(callback, *, label: str = "side effect") -> None:
+    def _wrapped():
+        try:
+            callback()
+        except Exception:
+            logger.exception("Failed to execute %s after commit", label)
+
+    transaction.on_commit(_wrapped)
 
 
 

@@ -1,12 +1,13 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { authApi, clearStoredAuth, getStoredAuth, normalizeAuthPayload, setStoredAuth } from '../services/api';
+import { AUTH_SESSION_EVENT, authApi, clearStoredAuth, getStoredAuth, normalizeAuthPayload, setStoredAuth } from '../services/api';
 
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [accessToken, setAccessToken] = useState(null);
-  const [refreshToken, setRefreshToken] = useState(null);
+  const storedSession = getStoredAuth();
+  const [user, setUser] = useState(storedSession?.user ?? null);
+  const [accessToken, setAccessToken] = useState(storedSession?.accessToken ?? null);
+  const [refreshToken, setRefreshToken] = useState(storedSession?.refreshToken ?? null);
   const [isLoading, setIsLoading] = useState(true);
   const isAuthenticated = Boolean(user && accessToken);
 
@@ -30,6 +31,29 @@ export const AuthProvider = ({ children }) => {
     setAccessToken(nextSession.accessToken);
     setRefreshToken(nextSession.refreshToken);
     return nextSession;
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return undefined;
+    }
+
+    const handleAuthSessionChange = (event) => {
+      const session = event?.detail ?? null;
+      if (!session) {
+        setUser(null);
+        setAccessToken(null);
+        setRefreshToken(null);
+        return;
+      }
+
+      setUser(session.user ?? null);
+      setAccessToken(session.accessToken ?? null);
+      setRefreshToken(session.refreshToken ?? null);
+    };
+
+    window.addEventListener(AUTH_SESSION_EVENT, handleAuthSessionChange);
+    return () => window.removeEventListener(AUTH_SESSION_EVENT, handleAuthSessionChange);
   }, []);
 
   const bootstrap = useCallback(async () => {

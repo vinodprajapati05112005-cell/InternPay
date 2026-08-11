@@ -237,8 +237,8 @@ const StudentSubmissionDetails = () => {
               ) : (
                 <div className="text-center py-6">
                   <Clock className="w-8 h-8 text-slate-400 mx-auto mb-3" />
-                  <p className="text-slate-600 font-medium">Evaluation in progress</p>
-                  <p className="text-sm text-slate-500 mt-1">Our AI is still analyzing this submission.</p>
+                  <p className="text-slate-600 font-medium">Awaiting company review</p>
+                  <p className="text-sm text-slate-500 mt-1">Your submission has been saved and is ready for the company to review.</p>
                 </div>
               )}
             </div>
@@ -249,7 +249,7 @@ const StudentSubmissionDetails = () => {
                 What happens next?
               </h3>
               <p className="text-sm text-slate-300 mb-4">
-                Once the AI evaluation is complete, you can review the report, accept the result, or file a dispute before the review window closes.
+                The company can now review your submission, request a revision, approve the work, or open a dispute before the review window closes.
               </p>
               <p className="text-xs text-slate-400">Submitted: {formatDateTime(submission.submitted_at)}</p>
             </div>

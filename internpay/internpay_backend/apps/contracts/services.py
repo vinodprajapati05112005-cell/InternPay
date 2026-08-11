@@ -2,12 +2,13 @@ from __future__ import annotations
 
 from decimal import Decimal
 
+from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Count, Max, Q, Sum
 from django.utils import timezone
 
 from apps.common.choices import ContractStatus, MilestoneStatus
-from apps.common.services import create_audit_log, create_notification
+from apps.common.services import create_audit_log, create_notification, run_after_commit
 from apps.contracts.models import Contract
 
 
@@ -69,6 +70,16 @@ def resolve_student(student_identity: str | None):
     return None
 
 
+def _ensure_editable(contract: Contract, action: str) -> None:
+    if contract.status not in {
+        ContractStatus.DRAFT,
+        ContractStatus.PENDING,
+        ContractStatus.REJECTED,
+        ContractStatus.FAILED,
+    }:
+        raise ValidationError({"detail": f"Only draft or pending contracts can be {action}."})
+
+
 @transaction.atomic
 def create_contract(*, company, validated_data: dict) -> Contract:
     milestones_data = validated_data.pop("milestones", [])
@@ -104,18 +115,22 @@ def create_contract(*, company, validated_data: dict) -> Contract:
 
     create_audit_log(actor=company.user, action="contract_created", target=contract, summary=f"Created contract {contract.title}")
     if contract.student:
-        create_notification(
-            user=contract.student.user,
-            title="New contract assigned",
-            message=f"You have been assigned to contract: {contract.title}",
-            notification_type="CONTRACT_UPDATE",
-            channel="BOTH",
+        run_after_commit(
+            lambda: create_notification(
+                user=contract.student.user,
+                title="New contract assigned",
+                message=f"You have been assigned to contract: {contract.title}",
+                notification_type="CONTRACT_UPDATE",
+                channel="BOTH",
+            ),
+            label="contract assignment notification",
         )
     return contract
 
 
 @transaction.atomic
 def update_contract(contract: Contract, validated_data: dict) -> Contract:
+    _ensure_editable(contract, "updated")
     for field in [
         "title",
         "description",
@@ -130,7 +145,11 @@ def update_contract(contract: Contract, validated_data: dict) -> Contract:
     if "student_id" in validated_data:
         student_id = validated_data.pop("student_id")
         contract.student = resolve_student(student_id)
-        if contract.student and contract.status == ContractStatus.DRAFT:
+        if contract.student and contract.status in {
+            ContractStatus.DRAFT,
+            ContractStatus.REJECTED,
+            ContractStatus.FAILED,
+        }:
             contract.status = ContractStatus.PENDING
     if validated_data.get("judge_id") is not None:
         from apps.judges.models import Judge
@@ -143,19 +162,23 @@ def update_contract(contract: Contract, validated_data: dict) -> Contract:
 @transaction.atomic
 def delete_contract(contract: Contract) -> None:
     contract.delete()
- 
- 
+
+
 @transaction.atomic
 def assign_student(contract: Contract, student) -> Contract:
+    _ensure_editable(contract, "assigned")
     contract.student = student
     contract.status = ContractStatus.PENDING
     contract.save(update_fields=["student", "status", "updated_at"])
-    create_notification(
-        user=student.user,
-        title="Contract assigned",
-        message=f"You have been assigned to contract: {contract.title}",
-        notification_type="CONTRACT_UPDATE",
-        channel="BOTH",
+    run_after_commit(
+        lambda: create_notification(
+            user=student.user,
+            title="Contract assigned",
+            message=f"You have been assigned to contract: {contract.title}",
+            notification_type="CONTRACT_UPDATE",
+            channel="BOTH",
+        ),
+        label="student assignment notification",
     )
     return contract
 
@@ -181,11 +204,14 @@ def create_milestones(contract: Contract, milestones_data: list[dict]):
 
 @transaction.atomic
 def add_milestones(contract: Contract, milestones_data: list[dict]):
+    _ensure_editable(contract, "modified")
     return create_milestones(contract, milestones_data)
 
 
 @transaction.atomic
 def cancel_contract(contract: Contract, reason: str = "") -> Contract:
+    if contract.status in {ContractStatus.COMPLETED, ContractStatus.CANCELLED, ContractStatus.ARCHIVED}:
+        raise ValidationError({"detail": "This contract can no longer be cancelled."})
     contract.status = ContractStatus.CANCELLED
     contract.cancelled_at = timezone.now()
     contract.notes = f"{contract.notes}\nCANCELLED: {reason}".strip()
@@ -203,36 +229,33 @@ def cancel_contract(contract: Contract, reason: str = "") -> Contract:
         pass
     return contract
 def fund_contract(contract: Contract, transaction_hash: str = "", reference: str = "") -> Contract:
-    if transaction_hash:
-        import re
-        from django.core.exceptions import ValidationError
-        tx_pattern = re.compile(r"^0x[a-fA-F0-9]{64}$")
-        clean_tx = transaction_hash.strip()
-        
-        # Support a mock failure hash
-        if clean_tx.lower() == "0xfailed" or "00000000" in clean_tx:
-            contract.status = ContractStatus.FAILED
-            contract.save(update_fields=["status", "updated_at"])
-            raise ValidationError("Blockchain transaction failed. The escrow could not be funded.")
-            
-        if not tx_pattern.match(clean_tx):
-            raise ValidationError("Invalid transaction hash format. Must be a valid 32-byte hexadecimal string starting with 0x.")
-            
-        with transaction.atomic():
-            contract.chain_reference = clean_tx
-            contract.funded_amount = contract.total_amount
-            contract.funded_at = timezone.now()
-            contract.status = ContractStatus.FUNDED
-            contract.save(update_fields=["funded_amount", "funded_at", "status", "chain_reference", "updated_at"])
-    else:
-        with transaction.atomic():
-            if reference:
-                contract.chain_reference = reference.strip()
-            contract.funded_amount = contract.total_amount
-            contract.funded_at = timezone.now()
-            contract.status = ContractStatus.FUNDED
-            contract.save(update_fields=["funded_amount", "funded_at", "status", "chain_reference", "updated_at"])
-            
+    if contract.status != ContractStatus.ACTIVE:
+        raise ValidationError({"detail": "Only active contracts can be funded."})
+
+    clean_tx = transaction_hash.strip()
+    if not clean_tx:
+        raise ValidationError({"transaction_hash": "A blockchain transaction hash is required."})
+
+    import re
+
+    tx_pattern = re.compile(r"^0x[a-fA-F0-9]{64}$")
+    if clean_tx.lower() == "0xfailed" or "00000000" in clean_tx:
+        contract.status = ContractStatus.FAILED
+        contract.save(update_fields=["status", "updated_at"])
+        raise ValidationError("Blockchain transaction failed. The escrow could not be funded.")
+
+    if not tx_pattern.match(clean_tx):
+        raise ValidationError("Invalid transaction hash format. Must be a valid 32-byte hexadecimal string starting with 0x.")
+
+    with transaction.atomic():
+        contract.chain_reference = clean_tx
+        if reference:
+            contract.metadata = {**(contract.metadata or {}), "reference": reference.strip()}
+        contract.funded_amount = contract.total_amount
+        contract.funded_at = timezone.now()
+        contract.status = ContractStatus.FUNDED
+        contract.save(update_fields=["funded_amount", "funded_at", "status", "chain_reference", "metadata", "updated_at"])
+
     return contract
 def get_contract_dashboard(company) -> dict:
     qs = Contract.objects.filter(company=company)

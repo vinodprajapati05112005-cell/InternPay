@@ -7,8 +7,8 @@ from django.db import transaction
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
-from apps.common.choices import AIAnalysisStatus, AIRecommendation, MilestoneStatus, NotificationType, SubmissionStatus
-from apps.common.services import create_audit_log, create_notification, normalize_score, recommendation_from_score
+from apps.common.choices import ContractStatus, MilestoneStatus, NotificationType, SubmissionStatus
+from apps.common.services import create_audit_log, create_notification, run_after_commit
 from apps.submissions.models import AIReport, Submission, SubmissionFile
 
 
@@ -42,29 +42,33 @@ def _store_files(submission: Submission, files: list) -> list[SubmissionFile]:
 
 @transaction.atomic
 def create_submission(*, student, validated_data: dict, request=None) -> Submission:
-    from apps.contracts.models import Contract
     from apps.milestones.models import Milestone
-    from apps.ai_engine.services import evaluate_submission_with_ai
 
     files = validated_data.pop("files", [])
     contract_id = validated_data.pop("contract_id")
     milestone_id = validated_data.pop("milestone_id")
 
+    from apps.contracts.models import Contract
+
     contract = Contract.objects.select_related("company", "student").filter(id=contract_id).first()
     if contract is None:
         raise ValidationError({"contract_id": "Contract not found."})
-    
+
     if contract.student is None or contract.student_id != student.id:
         raise ValidationError({"contract_id": "You are not assigned to this contract."})
 
-    from apps.common.choices import ContractStatus
-    if contract.status in {ContractStatus.PENDING, ContractStatus.REJECTED, ContractStatus.DRAFT, ContractStatus.FAILED}:
+    if contract.status not in {
+        ContractStatus.ACTIVE,
+        ContractStatus.FUNDED,
+        ContractStatus.IN_PROGRESS,
+        ContractStatus.SUBMITTED,
+    }:
         raise ValidationError({"contract_id": "You cannot submit work for a contract that is not active."})
 
     milestone = Milestone.objects.select_related("contract").filter(id=milestone_id).first()
     if milestone is None:
         raise ValidationError({"milestone_id": "Milestone not found."})
-        
+
     if milestone.contract_id != contract.id:
         raise ValidationError({"milestone_id": "This milestone does not belong to the specified contract."})
 
@@ -82,37 +86,41 @@ def create_submission(*, student, validated_data: dict, request=None) -> Submiss
         contract=contract,
         milestone=milestone,
         student=student,
-        status=SubmissionStatus.EVALUATING,
+        status=SubmissionStatus.SUBMITTED,
         **validated_data,
     )
     _store_files(submission, files)
     create_audit_log(actor=student.user, action="submission_created", target=submission, summary=f"Submitted work for {contract.title}")
-    create_notification(
-        user=contract.company.user,
-        title="New submission received",
-        message=f"{student.user.get_full_name() or student.user.email} submitted work for {contract.title}.",
-        notification_type=NotificationType.SUBMISSION_RECEIVED,
-        channel="BOTH",
+    run_after_commit(
+        lambda: create_notification(
+            user=contract.company.user,
+            title="New submission received",
+            message=f"{student.user.get_full_name() or student.user.email} submitted work for {contract.title}.",
+            notification_type=NotificationType.SUBMISSION_RECEIVED,
+            channel="BOTH",
+        ),
+        label="submission notification",
     )
 
-    evaluate_submission_with_ai(submission=submission, request=request)
-    submission.refresh_from_db()
+    contract.status = ContractStatus.SUBMITTED
+    contract.save(update_fields=["status", "updated_at"])
+
+    milestone.status = MilestoneStatus.SUBMITTED
+    milestone.submitted_at = submission.submitted_at
+    milestone.save(update_fields=["status", "submitted_at", "updated_at"])
+
     return submission
 
 
 @transaction.atomic
 def update_submission(*, submission: Submission, validated_data: dict, request=None) -> Submission:
-    from apps.ai_engine.services import evaluate_submission_with_ai
-
     files = validated_data.pop("files", [])
     for field in ["github_url", "demo_url", "figma_url", "documentation_url", "video_url", "additional_notes"]:
         if field in validated_data:
             setattr(submission, field, validated_data[field])
-    submission.status = SubmissionStatus.EVALUATING
+    submission.status = SubmissionStatus.SUBMITTED
     submission.save()
     _store_files(submission, files)
-    evaluate_submission_with_ai(submission=submission, request=request)
-    submission.refresh_from_db()
     return submission
 
 

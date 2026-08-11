@@ -14,6 +14,7 @@ import {
   Eye,
   Building2,
   Loader2,
+  Wallet,
 } from 'lucide-react';
 import { companyApi, authApi } from '../../services/api';
 import { formatDate, humanizeEnum } from '../../utils/formatters';

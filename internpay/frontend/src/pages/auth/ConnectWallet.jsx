@@ -19,8 +19,11 @@ import {
 import {
   clearStoredWalletSession,
   formatWeiToEth,
+  getExpectedChainId,
+  getExpectedChainLabel,
   getChainLabel,
   getStoredWalletSession,
+  isWrongNetwork,
   setStoredWalletSession,
   shortenWalletAddress,
 } from '../../utils/wallet';
@@ -96,11 +99,15 @@ const buildWalletSession = async (walletId) => {
 const ConnectWallet = () => {
   const [walletSession, setWalletSession] = useState(() => getStoredWalletSession());
   const [connectingWalletId, setConnectingWalletId] = useState(null);
+  const [switchingNetwork, setSwitchingNetwork] = useState(false);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState('');
 
   const hasProvider = typeof window !== 'undefined' && Boolean(window.ethereum);
   const connected = Boolean(walletSession?.address);
+  const wrongNetwork = connected && isWrongNetwork(walletSession?.chainId);
+  const expectedChainLabel = getExpectedChainLabel();
+  const expectedChainId = getExpectedChainId();
   const activeWallet = useMemo(() => {
     if (!walletSession?.walletId) {
       return null;
@@ -152,10 +159,56 @@ const ConnectWallet = () => {
     window.ethereum.on('chainChanged', handleChainChanged);
 
     return () => {
-      window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
-      window.ethereum.removeListener('chainChanged', handleChainChanged);
-    };
+    window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
+    window.ethereum.removeListener('chainChanged', handleChainChanged);
+  };
   }, []);
+
+  const switchToExpectedNetwork = async () => {
+    if (!hasProvider) {
+      setError('No wallet provider was detected in this browser.');
+      return;
+    }
+
+    setSwitchingNetwork(true);
+    setError('');
+
+    try {
+      await window.ethereum.request({
+        method: 'wallet_switchEthereumChain',
+        params: [{ chainId: expectedChainId }],
+      });
+    } catch (switchError) {
+      if (switchError?.code === 4902) {
+        await window.ethereum.request({
+          method: 'wallet_addEthereumChain',
+          params: [
+            {
+              chainId: expectedChainId,
+              chainName: expectedChainLabel,
+              rpcUrls: [import.meta.env.VITE_RPC_URL || 'https://sepolia-rollup.arbitrum.io/rpc'],
+              blockExplorerUrls: [import.meta.env.VITE_EXPLORER_URL || 'https://sepolia.arbiscan.io'],
+              nativeCurrency: {
+                name: 'Ether',
+                symbol: 'ETH',
+                decimals: 18,
+              },
+            },
+          ],
+        });
+      } else {
+        throw switchError;
+      }
+    } finally {
+      setSwitchingNetwork(false);
+    }
+
+    const nextSession = await buildWalletSession(walletSession?.walletId || 'metamask');
+    if (nextSession) {
+      setStoredWalletSession(nextSession);
+      setWalletSession(nextSession);
+    }
+  };
 
   useEffect(() => {
     if (!hasProvider) {
@@ -298,6 +351,11 @@ const ConnectWallet = () => {
                 </div>
 
                 <div className="bg-slate-50 rounded-xl border border-slate-200 p-4 space-y-3">
+                  {wrongNetwork && (
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                      Please switch MetaMask to {expectedChainLabel} before continuing.
+                    </div>
+                  )}
                   <div className="flex items-center justify-between gap-4">
                     <div className="flex items-center gap-2">
                       <Wallet className="w-4 h-4 text-slate-500" />
@@ -355,11 +413,34 @@ const ConnectWallet = () => {
                 <div className="space-y-3">
                   <Link
                     to="/select-role"
-                    className="w-full py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold rounded-xl shadow-lg shadow-blue-500/25 hover:shadow-xl hover:shadow-blue-500/30 transition-all flex items-center justify-center gap-2"
+                    aria-disabled={wrongNetwork}
+                    tabIndex={wrongNetwork ? -1 : 0}
+                    className={`w-full py-3 rounded-xl font-semibold shadow-lg shadow-blue-500/25 transition-all flex items-center justify-center gap-2 ${
+                      wrongNetwork
+                        ? 'bg-slate-300 text-slate-500 pointer-events-none'
+                        : 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:shadow-xl hover:shadow-blue-500/30'
+                    }`}
                   >
                     Continue to Role Selection
                     <ArrowRight className="w-5 h-5" />
                   </Link>
+                  {wrongNetwork && (
+                    <button
+                      type="button"
+                      onClick={() => void switchToExpectedNetwork()}
+                      disabled={switchingNetwork}
+                      className="w-full py-3 border border-amber-200 rounded-xl font-semibold text-amber-700 hover:bg-amber-50 hover:border-amber-300 transition-all flex items-center justify-center gap-2 disabled:opacity-60"
+                    >
+                      {switchingNetwork ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Switching Network...
+                        </>
+                      ) : (
+                        'Switch to Arbitrum Sepolia'
+                      )}
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={handleDisconnect}
