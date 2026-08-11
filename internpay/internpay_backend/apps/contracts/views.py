@@ -19,7 +19,13 @@ from apps.contracts.services import (
     resolve_student,
 )
 from apps.contracts.models import Contract
-from apps.contracts.serializers import ContractWriteSerializer, ContractDetailSerializer
+from apps.contracts.serializers import (
+    ContractAddMilestonesSerializer,
+    ContractAssignStudentSerializer,
+    ContractCancelSerializer,
+    ContractDetailSerializer,
+    ContractWriteSerializer,
+)
 from apps.students.models import Student
 from apps.companies.models import Company
 from internpay.utils.responses import success_response

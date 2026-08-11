@@ -14,7 +14,7 @@ const HowItWorks = () => {
       icon: Lock,
       color: 'indigo',
       title: '2. Company locks funds',
-      description: 'The company deposits USDC into the blockchain escrow. The funds are locked securely, giving the freelancer a guarantee of payment.'
+      description: 'The company deposits ETH into the blockchain escrow. The funds are locked securely, giving the freelancer a guarantee of payment.'
     },
     {
       icon: UploadCloud,

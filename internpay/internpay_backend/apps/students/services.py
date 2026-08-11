@@ -4,7 +4,16 @@ from decimal import Decimal
 
 from django.db.models import Count, Q, Sum
 
+from apps.common.choices import ContractStatus
 from apps.students.models import Student
+
+PAYMENT_TRACKED_STATUSES = {
+    ContractStatus.FUNDED,
+    ContractStatus.IN_PROGRESS,
+    ContractStatus.SUBMITTED,
+    ContractStatus.DISPUTED,
+    ContractStatus.COMPLETED,
+}
 
 
 def _claim_unassigned_contracts(student: Student) -> None:
@@ -49,9 +58,14 @@ def get_student_dashboard(student: Student) -> dict:
     _claim_unassigned_contracts(student)
 
     contracts = Contract.objects.filter(student=student)
+    payment_contracts = contracts.filter(status__in=PAYMENT_TRACKED_STATUSES)
     submissions = Submission.objects.select_related("contract", "milestone", "ai_report").filter(student=student)
-    total_amount = contracts.aggregate(total=Sum("total_amount"))["total"] or Decimal("0.00")
-    released_amount = contracts.aggregate(released=Sum("released_amount"))["released"] or Decimal("0.00")
+    payment_totals = payment_contracts.aggregate(
+        total=Sum("total_amount"),
+        released=Sum("released_amount"),
+    )
+    total_amount = payment_totals["total"] or Decimal("0.00")
+    released_amount = payment_totals["released"] or Decimal("0.00")
     aggregates = contracts.aggregate(
         total_contracts=Count("id"),
         active_contracts=Count("id", filter=Q(status__in=["ACTIVE", "IN_PROGRESS", "FUNDED", "SUBMITTED"])),
@@ -131,7 +145,7 @@ def get_student_contracts(student: Student) -> list[dict]:
 def get_student_payments(student: Student) -> list[dict]:
     from apps.contracts.models import Contract
 
-    contracts = Contract.objects.filter(student=student)
+    contracts = Contract.objects.filter(student=student, status__in=PAYMENT_TRACKED_STATUSES).order_by("-updated_at")
     payload = []
     for contract in contracts:
         pending_amount = max(contract.total_amount - contract.released_amount, Decimal("0.00"))

@@ -18,7 +18,7 @@ const endpoints = [
       title: 'string — Contract title',
       description: 'string — Detailed project description',
       freelancerAddress: 'string — Ethereum address of the freelancer',
-      totalAmount: 'number — Total payment amount in USDC',
+      totalAmount: 'number — Total payment amount in ETH',
       milestones: [
         {
           title: 'Frontend Implementation',

@@ -227,7 +227,7 @@ const Home = () => {
                 desc: 'The company deposits the agreed payment amount into a blockchain smart contract escrow. Funds are locked and cannot be withdrawn by either party until evaluation is complete.',
                 icon: Lock,
                 color: 'indigo',
-                detail: 'USDC/ETH deposits, smart contract holds, automatic milestone allocation',
+                detail: 'ETH deposits, smart contract holds, automatic milestone allocation',
               },
               {
                 step: 3,
@@ -432,7 +432,7 @@ const Home = () => {
                 <div className="w-full max-w-md bg-slate-800 rounded-2xl border border-slate-700 p-6 shadow-2xl">
                   <div className="text-center mb-6">
                     <div className="text-slate-400 text-sm font-bold uppercase tracking-widest mb-1">Escrow Balance</div>
-                    <div className="text-3xl font-black text-white">$1,500 <span className="text-base font-semibold text-slate-400">USDC</span></div>
+                    <div className="text-3xl font-black text-white">1,500 ETH</div>
                   </div>
 
                   <div className="space-y-4">

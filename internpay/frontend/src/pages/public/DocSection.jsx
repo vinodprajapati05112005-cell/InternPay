@@ -116,7 +116,7 @@ const OverviewSection = () => (
         { icon: Lock, title: 'Escrow Protection', desc: 'Funds locked in audited smart contracts until work is verified.' },
         { icon: BrainCircuit, title: 'AI Verification', desc: 'Automated, impartial code and design quality evaluation.' },
         { icon: Scale, title: 'Fair Disputes', desc: 'Human judges resolve escalations with full transparency.' },
-        { icon: Zap, title: 'Instant Payments', desc: 'Automatic USDC release upon approval — no waiting.' },
+        { icon: Zap, title: 'Instant Payments', desc: 'Automatic ETH release upon approval — no waiting.' },
         { icon: Layers, title: 'Milestone-Based', desc: 'Break projects into milestones for incremental delivery and payment.' },
         { icon: Shield, title: 'On-Chain Security', desc: 'All transactions are immutable and verifiable on the blockchain.' },
       ].map((item, i) => (
@@ -155,7 +155,7 @@ const OverviewSection = () => (
     <CodeBlock code={`Frontend:     React 18 + Tailwind CSS + Framer Motion
 Blockchain:   Ethereum / Polygon (Solidity smart contracts)
 AI Engine:    Custom evaluation models (Code, Design, UX)
-Payments:     USDC (ERC-20 stablecoin)
+Payments:     ETH (native token)
 Judge Layer:  Decentralized human review network`} />
   </div>
 );
@@ -200,7 +200,7 @@ const HowItWorksSection = () => (
     { title: "Backend",  amount: 750, deadline: "2026-09-01" }
   ],
   requirements: ["React 18+", "TypeScript", "80% test coverage"],
-  totalAmount: 1500  // USDC
+  totalAmount: 1500  // ETH
 }`,
       },
       {
@@ -208,11 +208,11 @@ const HowItWorksSection = () => (
         title: 'Escrow Funding',
         icon: Lock,
         color: 'indigo',
-        content: `The company funds the smart contract escrow with USDC. The full contract amount is locked on-chain — visible and verifiable by both parties. No work begins until funding is confirmed.`,
+        content: `The company funds the smart contract escrow with ETH. The full contract amount is locked on-chain — visible and verifiable by both parties. No work begins until funding is confirmed.`,
         detail: `The escrow contract uses a state machine pattern. Once funded, the contract moves from CREATED to FUNDED state. The freelancer is notified automatically and can begin work. Learn more in the Smart Contracts section.`,
         code: `// Escrow funding transaction
 await escrowContract.fund(contractId, {
-  value: ethers.utils.parseUnits("1500", 6),  // USDC has 6 decimals
+  value: ethers.utils.parseUnits("1500", 18),  // ETH has 18 decimals
   gasLimit: 150000
 });
 // Contract state: CREATED → FUNDED`,
@@ -444,7 +444,7 @@ contracts/
 4. AI Engine → Evaluates     → Off-chain report, hash on-chain
 5. 72h Window → No dispute?  → Auto-release (on-chain)
 6. Dispute?   → Judge Review  → Decision on-chain
-7. Payment    → Release/Refund → USDC transfer (on-chain)`} />
+7. Payment    → Release/Refund → ETH transfer (on-chain)`} />
   </div>
 );
 
@@ -480,7 +480,7 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
 
 contract InternPayEscrow is ReentrancyGuard, AccessControl {
     
-    IERC20 public immutable paymentToken;  // USDC
+    IERC20 public immutable paymentToken;  // ETH
     
     enum ContractState {
         CREATED,
@@ -1235,11 +1235,11 @@ async function main() {
   const [deployer] = await ethers.getSigners();
   console.log("Deploying with:", deployer.address);
 
-  // Deploy USDC mock (testnet only)
-  const MockUSDC = await ethers.getContractFactory("MockUSDC");
-  const usdc = await MockUSDC.deploy();
-  await usdc.deployed();
-  console.log("MockUSDC deployed to:", usdc.address);
+  // Deploy ETH mock (testnet only)
+  const MockETH = await ethers.getContractFactory("MockETH");
+  const ethToken = await MockETH.deploy();
+  await ethToken.deployed();
+  console.log("MockETH deployed to:", ethToken.address);
 
   // Deploy JudgeRegistry
   const JudgeRegistry = await ethers.getContractFactory("JudgeRegistry");
@@ -1254,7 +1254,7 @@ async function main() {
   // Deploy main Escrow contract
   const InternPayEscrow = await ethers.getContractFactory("InternPayEscrow");
   const escrow = await InternPayEscrow.deploy(
-    usdc.address,
+    ethToken.address,
     disputeManager.address,
     deployer.address  // treasury
   );
@@ -1289,7 +1289,7 @@ docker run -p 3000:3000 internpay-frontend`} />
 VITE_CHAIN_ID=137                           # Polygon mainnet
 VITE_RPC_URL=https://polygon-rpc.com
 VITE_ESCROW_CONTRACT=0x1234...5678
-VITE_USDC_CONTRACT=0xabcd...ef01
+VITE_ETH_CONTRACT=0xabcd...ef01
 
 # API
 VITE_API_URL=https://api.internpay.dev/v1
@@ -1392,7 +1392,7 @@ const EconomicsSection = () => (
     <h2 className="text-2xl font-extrabold text-slate-900 mb-4 mt-10">Payment Flow</h2>
     <CodeBlock code={`Payment Flow (No Dispute):
 
-Company funds escrow:        $1,500.00 USDC
+Company funds escrow:        1,500.00 ETH
                                   │
                             Milestone 1: $750
                                   │

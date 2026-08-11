@@ -54,8 +54,8 @@ export const getUserDisplayName = (user) => {
 
   if (user.role === 'STUDENT') {
     return (
-      user.institution_name ||
-      profile.institution_name ||
+      user.first_name ||
+      profile.first_name ||
       fullName ||
       user.email ||
       'Student'

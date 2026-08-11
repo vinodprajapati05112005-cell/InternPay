@@ -236,13 +236,13 @@ export const mockDisputes = [
 ];
 
 export const mockPayments = [
-  { id: 'PAY-001', contractId: 'CTR-003', milestone: 'Core Screens', amount: 1000, currency: 'USDC', status: 'Released', date: '2026-05-22', txHash: '0xa1b2...c3d4' },
-  { id: 'PAY-002', contractId: 'CTR-003', milestone: 'Backend Integration', amount: 1000, currency: 'USDC', status: 'Released', date: '2026-06-07', txHash: '0xe5f6...g7h8' },
-  { id: 'PAY-003', contractId: 'CTR-003', milestone: 'Polish & Testing', amount: 500, currency: 'USDC', status: 'Released', date: '2026-06-16', txHash: '0xi9j0...k1l2' },
-  { id: 'PAY-004', contractId: 'CTR-001', milestone: 'UI/UX Design', amount: 300, currency: 'USDC', status: 'Released', date: '2026-06-27', txHash: '0xm3n4...o5p6' },
-  { id: 'PAY-005', contractId: 'CTR-001', milestone: 'Frontend Implementation', amount: 800, currency: 'USDC', status: 'Dispute Window', date: '2026-07-14', txHash: null },
-  { id: 'PAY-006', contractId: 'CTR-004', milestone: 'Design Concepts', amount: 300, currency: 'USDC', status: 'Released', date: '2026-06-17', txHash: '0xq7r8...s9t0' },
-  { id: 'PAY-007', contractId: 'CTR-004', milestone: 'Development', amount: 500, currency: 'USDC', status: 'Disputed', date: '2026-06-29', txHash: null },
+  { id: 'PAY-001', contractId: 'CTR-003', milestone: 'Core Screens', amount: 1000, currency: 'ETH', status: 'Released', date: '2026-05-22', txHash: '0xa1b2...c3d4' },
+  { id: 'PAY-002', contractId: 'CTR-003', milestone: 'Backend Integration', amount: 1000, currency: 'ETH', status: 'Released', date: '2026-06-07', txHash: '0xe5f6...g7h8' },
+  { id: 'PAY-003', contractId: 'CTR-003', milestone: 'Polish & Testing', amount: 500, currency: 'ETH', status: 'Released', date: '2026-06-16', txHash: '0xi9j0...k1l2' },
+  { id: 'PAY-004', contractId: 'CTR-001', milestone: 'UI/UX Design', amount: 300, currency: 'ETH', status: 'Released', date: '2026-06-27', txHash: '0xm3n4...o5p6' },
+  { id: 'PAY-005', contractId: 'CTR-001', milestone: 'Frontend Implementation', amount: 800, currency: 'ETH', status: 'Dispute Window', date: '2026-07-14', txHash: null },
+  { id: 'PAY-006', contractId: 'CTR-004', milestone: 'Design Concepts', amount: 300, currency: 'ETH', status: 'Released', date: '2026-06-17', txHash: '0xq7r8...s9t0' },
+  { id: 'PAY-007', contractId: 'CTR-004', milestone: 'Development', amount: 500, currency: 'ETH', status: 'Disputed', date: '2026-06-29', txHash: null },
 ];
 
 export const mockJudgeStats = {

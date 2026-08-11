@@ -60,7 +60,7 @@ const Terms = () => {
         },
         {
           subtitle: '5.2 Escrow Funding',
-          content: 'Companies must deposit the full contract value (in USDC or approved stablecoins) into the escrow smart contract before a freelancer can begin work. Funds are locked and cannot be withdrawn unilaterally by either party.'
+          content: 'Companies must deposit the full contract value in ETH into the escrow smart contract before a freelancer can begin work. Funds are locked and cannot be withdrawn unilaterally by either party.'
         },
         {
           subtitle: '5.3 Payment Release',

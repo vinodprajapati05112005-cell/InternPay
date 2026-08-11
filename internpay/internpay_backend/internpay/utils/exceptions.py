@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import exceptions, status
 from rest_framework.response import Response
 from rest_framework.views import exception_handler as drf_exception_handler
@@ -38,7 +39,31 @@ def _error_message(exc: Exception) -> str:
     return "Request failed"
 
 
+def _django_validation_errors(exc: DjangoValidationError) -> dict:
+    message_dict = getattr(exc, "message_dict", None)
+    if message_dict:
+        return message_dict
+
+    messages = list(getattr(exc, "messages", []) or [])
+    if len(messages) == 1:
+        return {"detail": messages[0]}
+    if messages:
+        return {"detail": messages}
+    return {"detail": str(exc)}
+
+
 def exception_handler(exc, context):
+    if isinstance(exc, DjangoValidationError):
+        errors = _django_validation_errors(exc)
+        return Response(
+            {
+                "success": False,
+                "message": _extract_message(errors) or "Validation failed",
+                "errors": errors,
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
     response = drf_exception_handler(exc, context)
     if response is None:
         import traceback

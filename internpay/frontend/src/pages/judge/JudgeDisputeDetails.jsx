@@ -29,7 +29,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { contractApi, disputeApi, submissionApi } from '../../services/api';
-import { compactHash, formatCurrency, formatDateTime, humanizeEnum } from '../../utils/formatters';
+import { compactHash, formatDateTime, formatTokenAmount, humanizeEnum } from '../../utils/formatters';
 
 const decisionButtons = [
   {
@@ -260,7 +260,7 @@ const JudgeDisputeDetails = () => {
             <span className={`text-sm font-semibold px-4 py-2 rounded-full ${statusStyles[disputeStatus] || 'bg-slate-100 text-slate-700'}`}>
               {humanizeEnum(disputeStatus)}
             </span>
-            <span className="text-2xl font-extrabold text-slate-900">{formatCurrency(disputedAmount)}</span>
+            <span className="text-2xl font-extrabold text-slate-900">{formatTokenAmount(disputedAmount)}</span>
           </div>
         </div>
       </motion.div>
@@ -293,7 +293,7 @@ const JudgeDisputeDetails = () => {
                   </div>
                   <div>
                     <label className="text-xs font-medium text-slate-400 uppercase tracking-wider">Disputed Amount</label>
-                    <p className="text-sm font-semibold text-slate-900 mt-1">{formatCurrency(disputedAmount)} USDC</p>
+                    <p className="text-sm font-semibold text-slate-900 mt-1">{formatTokenAmount(disputedAmount)}</p>
                   </div>
                 </div>
                 <div className="space-y-4">
@@ -339,7 +339,7 @@ const JudgeDisputeDetails = () => {
                         Milestone {milestone.order}: {milestone.title}
                       </h3>
                       <div className="flex items-center gap-2">
-                        <span className="text-xs font-medium text-slate-500">{formatCurrency(milestone.amount)}</span>
+                        <span className="text-xs font-medium text-slate-500">{formatTokenAmount(milestone.amount)}</span>
                         <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
                           {humanizeEnum(milestone.status)}
                         </span>
@@ -649,11 +649,11 @@ const JudgeDisputeDetails = () => {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-500">Resolution Amount</span>
-                    <span className="font-semibold text-slate-900">{formatCurrency(dispute.resolution_amount)}</span>
+                    <span className="font-semibold text-slate-900">{formatTokenAmount(dispute.resolution_amount)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-500">Judge Reward</span>
-                    <span className="font-semibold text-slate-900">{formatCurrency(dispute.judge_reward)}</span>
+                    <span className="font-semibold text-slate-900">{formatTokenAmount(dispute.judge_reward)}</span>
                   </div>
                 </div>
               </div>

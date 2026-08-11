@@ -2,7 +2,15 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Wallet, ArrowUpRight, Clock, CheckCircle2, ShieldAlert, ArrowRightCircle, RefreshCcw, Loader2 } from 'lucide-react';
 import { studentApi } from '../../services/api';
-import { formatCurrency, humanizeEnum } from '../../utils/formatters';
+import { formatTokenAmount, humanizeEnum } from '../../utils/formatters';
+
+const PAYMENT_TRACKED_STATUSES = new Set([
+  'FUNDED',
+  'IN_PROGRESS',
+  'SUBMITTED',
+  'DISPUTED',
+  'COMPLETED',
+]);
 
 const StudentPayments = () => {
   const [payments, setPayments] = useState([]);
@@ -39,17 +47,22 @@ const StudentPayments = () => {
     };
   }, []);
 
+  const paymentEntries = useMemo(
+    () => payments.filter((payment) => PAYMENT_TRACKED_STATUSES.has(String(payment.status || '').toUpperCase())),
+    [payments],
+  );
+
   const summary = useMemo(() => {
-    const released = payments.reduce((sum, item) => sum + Number(item.released_amount || 0), 0);
-    const pending = payments.reduce((sum, item) => sum + Number(item.pending_amount || 0), 0);
-    const funded = payments.reduce((sum, item) => sum + Number(item.funded_amount || 0), 0);
+    const released = paymentEntries.reduce((sum, item) => sum + Number(item.released_amount || 0), 0);
+    const pending = paymentEntries.reduce((sum, item) => sum + Number(item.pending_amount || 0), 0);
+    const funded = paymentEntries.reduce((sum, item) => sum + Number(item.funded_amount || 0), 0);
     return {
       totalReleased: released,
       totalPending: pending,
       totalFunded: funded,
-      totalContracts: payments.length,
+      totalContracts: paymentEntries.length,
     };
-  }, [payments]);
+  }, [paymentEntries]);
 
   const getStatusBadge = (status) => {
     switch (String(status || '').toUpperCase()) {
@@ -125,7 +138,7 @@ const StudentPayments = () => {
               </div>
               <h2 className="font-semibold text-emerald-50">Total Released</h2>
             </div>
-            <div className="text-4xl font-extrabold">{formatCurrency(summary.totalReleased)} <span className="text-lg font-medium text-emerald-200">USDC</span></div>
+            <div className="text-4xl font-extrabold">{formatTokenAmount(summary.totalReleased)}</div>
             <Link to="/student/contracts" className="mt-6 inline-flex px-4 py-2 bg-white text-emerald-700 rounded-xl font-semibold text-sm hover:bg-emerald-50 transition-colors shadow-sm">
               Review Contracts
             </Link>
@@ -138,8 +151,8 @@ const StudentPayments = () => {
               </div>
               <h2 className="font-semibold text-slate-600">Pending Amount</h2>
             </div>
-            <div className="text-4xl font-extrabold text-slate-900">{formatCurrency(summary.totalPending)} <span className="text-lg font-medium text-slate-400">USDC</span></div>
-            <p className="mt-6 text-sm text-slate-500">Funds awaiting evaluation or dispute resolution.</p>
+            <div className="text-4xl font-extrabold text-slate-900">{formatTokenAmount(summary.totalPending)}</div>
+            <p className="mt-6 text-sm text-slate-500">Funds awaiting release or dispute resolution.</p>
           </div>
         </div>
 
@@ -150,7 +163,7 @@ const StudentPayments = () => {
               <p className="text-sm text-slate-500 mt-1">{summary.totalContracts} contract{summary.totalContracts === 1 ? '' : 's'} tracked</p>
             </div>
             <div className="text-right text-sm text-slate-500">
-              <p>Funded total: <span className="font-semibold text-slate-900">{formatCurrency(summary.totalFunded)}</span></p>
+              <p>Funded total: <span className="font-semibold text-slate-900">{formatTokenAmount(summary.totalFunded)}</span></p>
             </div>
           </div>
           <div className="overflow-x-auto">
@@ -166,20 +179,20 @@ const StudentPayments = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {payments.map((payment) => (
+                {paymentEntries.map((payment) => (
                   <tr key={payment.contract_id} className="hover:bg-slate-50/50 transition-colors">
                     <td className="p-4 pl-6">
                       <div className="font-semibold text-slate-900">{payment.contract_title}</div>
                       <div className="text-xs text-slate-500 mt-1 font-mono">{payment.contract_id}</div>
                     </td>
                     <td className="p-4">
-                      <div className="font-bold text-slate-900">{formatCurrency(payment.total_amount)}</div>
+                      <div className="font-bold text-slate-900">{formatTokenAmount(payment.total_amount)}</div>
                     </td>
                     <td className="p-4">
-                      <div className="font-bold text-emerald-700">{formatCurrency(payment.released_amount)}</div>
+                      <div className="font-bold text-emerald-700">{formatTokenAmount(payment.released_amount)}</div>
                     </td>
                     <td className="p-4">
-                      <div className="font-bold text-amber-700">{formatCurrency(payment.pending_amount)}</div>
+                      <div className="font-bold text-amber-700">{formatTokenAmount(payment.pending_amount)}</div>
                     </td>
                     <td className="p-4">
                       <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${getStatusBadge(payment.status)}`}>
@@ -195,7 +208,7 @@ const StudentPayments = () => {
                     </td>
                   </tr>
                 ))}
-                {payments.length === 0 && (
+                {paymentEntries.length === 0 && (
                   <tr>
                     <td colSpan="6" className="p-8 text-center text-slate-500">
                       No payment records found.

@@ -31,7 +31,7 @@ const ForCompanies = () => {
     {
       icon: Lock,
       title: 'Lock Funds in Escrow',
-      description: 'Deposit USDC into our blockchain escrow. Funds are secured on-chain and only released when milestones are verified and approved.'
+      description: 'Deposit ETH into our blockchain escrow. Funds are secured on-chain and only released when milestones are verified and approved.'
     },
     {
       icon: Eye,
@@ -63,7 +63,7 @@ const ForCompanies = () => {
   const workflowSteps = [
     { icon: FileText, label: 'Create Contract', color: 'blue', desc: 'Define scope & requirements' },
     { icon: Target, label: 'Define Milestones', color: 'indigo', desc: 'Set deliverables & deadlines' },
-    { icon: Lock, label: 'Fund Escrow', color: 'purple', desc: 'Lock USDC on-chain' },
+    { icon: Lock, label: 'Fund Escrow', color: 'purple', desc: 'Lock ETH on-chain' },
     { icon: Eye, label: 'Review Work', color: 'sky', desc: 'Examine submissions' },
     { icon: BrainCircuit, label: 'Review AI Report', color: 'violet', desc: 'AI scores & reasoning' },
     { icon: CheckCircle2, label: 'Approve or Dispute', color: 'emerald', desc: 'Release funds or escalate' }

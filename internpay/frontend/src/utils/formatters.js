@@ -12,22 +12,19 @@ export const humanizeEnum = (value) => {
 };
 
 export const formatCurrency = (value, currency = 'USD', minimumFractionDigits = 0) => {
-  const numericValue = Number(value ?? 0);
-  const safeCurrency = currency || 'USD';
+  const symbol = currency && currency !== 'USD' ? currency : 'ETH';
+  return formatTokenAmount(value, symbol, minimumFractionDigits);
+};
 
-  try {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: safeCurrency,
-      minimumFractionDigits,
-      maximumFractionDigits: minimumFractionDigits,
-    }).format(numericValue);
-  } catch {
-    return `$${numericValue.toLocaleString('en-US', {
-      minimumFractionDigits,
-      maximumFractionDigits: minimumFractionDigits,
-    })}`;
-  }
+export const formatTokenAmount = (value, symbol = 'ETH', minimumFractionDigits = 0) => {
+  const numericValue = Number(value ?? 0);
+
+  const formatted = new Intl.NumberFormat('en-US', {
+    minimumFractionDigits,
+    maximumFractionDigits: minimumFractionDigits,
+  }).format(Number.isFinite(numericValue) ? numericValue : 0);
+
+  return symbol ? `${formatted} ${symbol}` : formatted;
 };
 
 export const formatDate = (value, options = {}) => {
