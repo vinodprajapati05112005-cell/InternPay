@@ -5,6 +5,7 @@ from decimal import Decimal
 from django.utils import timezone
 from rest_framework import serializers
 
+from apps.common.amounts import AMOUNT_DECIMAL_PLACES, AMOUNT_MAX_DIGITS
 from apps.common.choices import ContractStatus, MilestoneStatus
 from apps.common.serializers import BaseModelSerializer
 from apps.common.validators import validate_future_deadline, validate_positive_amount
@@ -14,7 +15,7 @@ from apps.contracts.models import Contract
 class ContractMilestoneInputSerializer(serializers.Serializer):
     title = serializers.CharField(max_length=255)
     description = serializers.CharField()
-    amount = serializers.DecimalField(max_digits=12, decimal_places=2)
+    amount = serializers.DecimalField(max_digits=AMOUNT_MAX_DIGITS, decimal_places=AMOUNT_DECIMAL_PLACES)
     deadline = serializers.DateTimeField()
     order = serializers.IntegerField(required=False, min_value=1)
 
@@ -76,7 +77,7 @@ class ContractMilestoneSummarySerializer(serializers.Serializer):
     id = serializers.CharField()
     title = serializers.CharField()
     description = serializers.CharField()
-    amount = serializers.DecimalField(max_digits=12, decimal_places=2)
+    amount = serializers.DecimalField(max_digits=AMOUNT_MAX_DIGITS, decimal_places=AMOUNT_DECIMAL_PLACES)
     deadline = serializers.DateTimeField()
     order = serializers.IntegerField()
     status = serializers.CharField()
@@ -211,7 +212,7 @@ class ContractDashboardSerializer(serializers.Serializer):
     disputed_contracts = serializers.IntegerField()
     completed_contracts = serializers.IntegerField()
     cancelled_contracts = serializers.IntegerField()
-    total_value = serializers.DecimalField(max_digits=12, decimal_places=2)
+    total_value = serializers.DecimalField(max_digits=AMOUNT_MAX_DIGITS, decimal_places=AMOUNT_DECIMAL_PLACES)
     recent_contracts = serializers.ListField(child=serializers.DictField())
 
 

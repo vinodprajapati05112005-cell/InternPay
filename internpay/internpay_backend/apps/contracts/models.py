@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from django.db import models
 
+from apps.common.amounts import AMOUNT_DECIMAL_PLACES, AMOUNT_MAX_DIGITS
 from apps.common.choices import ContractStatus
 from apps.common.models import BaseModel
 
@@ -29,10 +30,10 @@ class Contract(BaseModel):
     title = models.CharField(max_length=255, db_index=True)
     description = models.TextField()
     requirements = models.JSONField(default=list, blank=True)
-    total_amount = models.DecimalField(max_digits=12, decimal_places=2)
+    total_amount = models.DecimalField(max_digits=AMOUNT_MAX_DIGITS, decimal_places=AMOUNT_DECIMAL_PLACES)
     currency = models.CharField(max_length=8, default="USD")
-    funded_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    released_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    funded_amount = models.DecimalField(max_digits=AMOUNT_MAX_DIGITS, decimal_places=AMOUNT_DECIMAL_PLACES, default=0)
+    released_amount = models.DecimalField(max_digits=AMOUNT_MAX_DIGITS, decimal_places=AMOUNT_DECIMAL_PLACES, default=0)
     status = models.CharField(max_length=30, choices=ContractStatus.choices, default=ContractStatus.DRAFT, db_index=True)
     deadline = models.DateTimeField(null=True, blank=True)
     dispute_deadline = models.DateTimeField(null=True, blank=True)

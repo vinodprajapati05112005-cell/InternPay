@@ -9,6 +9,7 @@ from django.db import transaction
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
+from apps.common.amounts import AMOUNT_QUANTUM
 from apps.common.choices import ContractStatus, DisputeDecision, DisputeReason, DisputeStatus, NotificationType, SubmissionStatus, UserRole
 from apps.common.services import create_audit_log, create_notification
 from apps.disputes.models import Dispute
@@ -159,7 +160,7 @@ def resolve_dispute(*, dispute: Dispute, judge, validated_data: dict, request=No
         dispute.status = DisputeStatus.RESOLVED
     elif decision == DisputeDecision.PARTIAL_PAYMENT:
         split = Decimal(str(split_percentage or 50))
-        resolution_amount = (contract_amount * split / Decimal("100")).quantize(Decimal("0.01"))
+        resolution_amount = (contract_amount * split / Decimal("100")).quantize(AMOUNT_QUANTUM)
         # ==========================================
         # TODO FOR BLOCKCHAIN TEAM
         #
@@ -175,7 +176,7 @@ def resolve_dispute(*, dispute: Dispute, judge, validated_data: dict, request=No
     dispute.resolved_at = timezone.now()
     dispute.transaction_hash = transaction_hash
     dispute.resolution_amount = resolution_amount
-    dispute.judge_reward = (resolution_amount * Decimal("0.025")).quantize(Decimal("0.01"))
+    dispute.judge_reward = (resolution_amount * Decimal("0.025")).quantize(AMOUNT_QUANTUM)
     dispute.save()
 
     contract = dispute.contract

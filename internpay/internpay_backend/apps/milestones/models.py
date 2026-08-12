@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from django.db import models
 
+from apps.common.amounts import AMOUNT_DECIMAL_PLACES, AMOUNT_MAX_DIGITS
 from apps.common.choices import MilestoneStatus
 from apps.common.models import BaseModel
 
@@ -14,7 +15,7 @@ class Milestone(BaseModel):
     )
     title = models.CharField(max_length=255)
     description = models.TextField()
-    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    amount = models.DecimalField(max_digits=AMOUNT_MAX_DIGITS, decimal_places=AMOUNT_DECIMAL_PLACES)
     deadline = models.DateTimeField()
     order = models.PositiveIntegerField(default=1)
     status = models.CharField(max_length=30, choices=MilestoneStatus.choices, default=MilestoneStatus.PENDING, db_index=True)

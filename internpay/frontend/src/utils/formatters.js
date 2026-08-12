@@ -11,17 +11,31 @@ export const humanizeEnum = (value) => {
     .replace(/\b\w/g, (char) => char.toUpperCase());
 };
 
-export const formatCurrency = (value, currency = 'USD', minimumFractionDigits = 0) => {
+// Keep small ETH amounts visible without forcing fixed trailing zeros.
+const DEFAULT_MAX_FRACTION_DIGITS = 6;
+
+export const formatCurrency = (
+  value,
+  currency = 'USD',
+  minimumFractionDigits = 0,
+  maximumFractionDigits = DEFAULT_MAX_FRACTION_DIGITS,
+) => {
   const symbol = currency && currency !== 'USD' ? currency : 'ETH';
-  return formatTokenAmount(value, symbol, minimumFractionDigits);
+  return formatTokenAmount(value, symbol, minimumFractionDigits, maximumFractionDigits);
 };
 
-export const formatTokenAmount = (value, symbol = 'ETH', minimumFractionDigits = 0) => {
+export const formatTokenAmount = (
+  value,
+  symbol = 'ETH',
+  minimumFractionDigits = 0,
+  maximumFractionDigits = DEFAULT_MAX_FRACTION_DIGITS,
+) => {
   const numericValue = Number(value ?? 0);
+  const fractionDigits = Math.max(minimumFractionDigits, maximumFractionDigits);
 
   const formatted = new Intl.NumberFormat('en-US', {
     minimumFractionDigits,
-    maximumFractionDigits: minimumFractionDigits,
+    maximumFractionDigits: fractionDigits,
   }).format(Number.isFinite(numericValue) ? numericValue : 0);
 
   return symbol ? `${formatted} ${symbol}` : formatted;

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from rest_framework import serializers
 
+from apps.common.amounts import AMOUNT_DECIMAL_PLACES, AMOUNT_MAX_DIGITS
 from apps.common.serializers import BaseModelSerializer
 from apps.common.validators import validate_future_deadline, validate_positive_amount
 from apps.milestones.models import Milestone
@@ -40,7 +41,7 @@ class MilestoneWriteSerializer(serializers.Serializer):
     contract_id = serializers.UUIDField(required=False)
     title = serializers.CharField(max_length=255)
     description = serializers.CharField()
-    amount = serializers.DecimalField(max_digits=12, decimal_places=2)
+    amount = serializers.DecimalField(max_digits=AMOUNT_MAX_DIGITS, decimal_places=AMOUNT_DECIMAL_PLACES)
     deadline = serializers.DateTimeField()
     order = serializers.IntegerField(required=False, min_value=1)
 

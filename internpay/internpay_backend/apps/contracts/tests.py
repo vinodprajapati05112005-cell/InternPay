@@ -1,7 +1,9 @@
 from decimal import Decimal
+from datetime import timedelta
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase
+from django.utils import timezone
 from rest_framework.test import APIClient
 
 from apps.common.choices import ContractStatus, UserRole
@@ -95,4 +97,52 @@ class ContractDashboardTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.data["success"])
         self.assertEqual(response.data["data"]["total_contracts"], 1)
-        self.assertEqual(response.data["data"]["total_value"], "250.00")
+        self.assertEqual(response.data["data"]["total_value"], "250.000000")
+
+
+class ContractCreatePrecisionTests(TestCase):
+    def test_create_contract_preserves_fractional_amounts(self):
+        client = APIClient()
+        user = User.objects.create_user(
+            email="precision-company@example.com",
+            password="StrongPass123!",
+            role=UserRole.COMPANY,
+        )
+        company = user.company_profile
+        company.company_name = "Precision Co"
+        company.save()
+
+        client.force_authenticate(user=user)
+        now = timezone.now()
+        deadline = now + timedelta(days=7)
+        milestone_deadline = now + timedelta(days=1)
+        payload = {
+            "title": "Fractional Precision Contract",
+            "description": "Verifies 0.001 ETH amounts stay intact.",
+            "requirements": ["Precision handling"],
+            "deadline": deadline.isoformat(),
+            "currency": "ETH",
+            "total_amount": "0.001",
+            "notes": "Fractional ETH test",
+            "student_id": "",
+            "judge_id": None,
+            "milestones": [
+                {
+                    "title": "Tiny milestone",
+                    "description": "A very small amount",
+                    "amount": "0.001",
+                    "deadline": milestone_deadline.isoformat(),
+                    "order": 1,
+                }
+            ],
+        }
+
+        response = client.post("/api/contracts/", payload, format="json")
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data["data"]["total_amount"], "0.001000")
+        self.assertEqual(response.data["data"]["milestones"][0]["amount"], "0.001000")
+
+        contract = Contract.objects.get(id=response.data["data"]["id"])
+        self.assertEqual(contract.total_amount, Decimal("0.001000"))
+        self.assertEqual(contract.milestones.first().amount, Decimal("0.001000"))

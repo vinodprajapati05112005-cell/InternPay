@@ -5,6 +5,7 @@ from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
 
+from apps.common.amounts import AMOUNT_DECIMAL_PLACES, AMOUNT_MAX_DIGITS
 from apps.common.choices import DisputeDecision, DisputeReason, DisputeStatus
 from apps.common.models import BaseModel
 
@@ -42,8 +43,8 @@ class Dispute(BaseModel):
     dispute_deadline = models.DateTimeField(null=True, blank=True, db_index=True)
     resolved_at = models.DateTimeField(null=True, blank=True, db_index=True)
     transaction_hash = models.CharField(max_length=255, blank=True, default="")
-    resolution_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    judge_reward = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    resolution_amount = models.DecimalField(max_digits=AMOUNT_MAX_DIGITS, decimal_places=AMOUNT_DECIMAL_PLACES, default=0)
+    judge_reward = models.DecimalField(max_digits=AMOUNT_MAX_DIGITS, decimal_places=AMOUNT_DECIMAL_PLACES, default=0)
     metadata = models.JSONField(default=dict, blank=True)
 
     class Meta:

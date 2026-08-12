@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from rest_framework import serializers
 
+from apps.common.amounts import AMOUNT_DECIMAL_PLACES, AMOUNT_MAX_DIGITS
 from apps.common.serializers import BaseModelSerializer
 from apps.companies.models import Company
 
@@ -33,5 +34,5 @@ class CompanyDashboardSerializer(serializers.Serializer):
     funded_contracts = serializers.IntegerField()
     completed_contracts = serializers.IntegerField()
     disputed_contracts = serializers.IntegerField()
-    total_spent = serializers.DecimalField(max_digits=12, decimal_places=2)
+    total_spent = serializers.DecimalField(max_digits=AMOUNT_MAX_DIGITS, decimal_places=AMOUNT_DECIMAL_PLACES)
     recent_contracts = serializers.ListField(child=serializers.DictField())

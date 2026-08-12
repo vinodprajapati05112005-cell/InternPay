@@ -303,9 +303,11 @@ const CreateContract = () => {
                         <label className="block text-xs font-semibold text-slate-600 mb-1">Amount (ETH) *</label>
                         <input
                           type="number"
+                          step="0.000001"
+                          inputMode="decimal"
                           value={milestone.amount}
                           onChange={(event) => updateMilestone(milestone.id, 'amount', event.target.value)}
-                          placeholder="500"
+                          placeholder="0.001"
                           className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
                         {errors[`m${index}_amount`] && <p className="text-red-500 text-xs mt-1">{errors[`m${index}_amount`]}</p>}
