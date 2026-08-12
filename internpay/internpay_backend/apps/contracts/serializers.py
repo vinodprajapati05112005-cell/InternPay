@@ -113,6 +113,7 @@ class ContractDetailSerializer(BaseModelSerializer):
             "funded_amount",
             "released_amount",
             "status",
+            "is_paused",
             "deadline",
             "dispute_deadline",
             "funded_at",

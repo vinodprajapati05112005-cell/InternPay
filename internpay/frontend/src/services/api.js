@@ -313,6 +313,8 @@ export const contractApi = {
   fund: (id, data = {}) => api.post(`/api/contracts/${id}/fund/`, data),
   accept: (id) => api.post(`/api/contracts/${id}/accept/`, {}),
   reject: (id) => api.post(`/api/contracts/${id}/reject/`, {}),
+  pause: (id) => api.post(`/api/contracts/${id}/pause/`, {}),
+  unpause: (id) => api.post(`/api/contracts/${id}/unpause/`, {}),
   dashboard: () => api.get('/api/contracts/dashboard/'),
 };
 
@@ -339,6 +341,12 @@ export const disputeApi = {
 export const aiApi = {
   health: () => api.get('/api/ai/health/'),
   evaluateSubmission: (submissionId) => api.post(`/api/ai/submissions/${submissionId}/evaluate/`, {}),
+};
+
+export const notificationApi = {
+  list: () => api.get('/api/notifications/'),
+  read: (id) => api.post(`/api/notifications/${id}/read/`, {}),
+  readAll: () => api.post('/api/notifications/read-all/', {}),
 };
 
 export { API_BASE_URL, ApiError, buildUrl };

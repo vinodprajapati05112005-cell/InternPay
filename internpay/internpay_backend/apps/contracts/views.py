@@ -17,6 +17,8 @@ from apps.contracts.services import (
     get_contract_dashboard,
     update_contract,
     resolve_student,
+    pause_contract,
+    unpause_contract,
 )
 from apps.contracts.models import Contract
 from apps.contracts.serializers import (
@@ -240,3 +242,32 @@ class ContractViewSet(viewsets.ModelViewSet):
             message="Contract dashboard retrieved successfully",
         )
 
+    @action(detail=True, methods=["post"], url_path="pause")
+    def pause_action(self, request, id=None):
+        contract = self.get_object()
+        if request.user.role != UserRole.COMPANY and not request.user.is_superuser:
+            return Response({"success": False, "message": "Only companies can pause contracts."}, status=status.HTTP_403_FORBIDDEN)
+        contract = pause_contract(contract)
+        
+        from apps.common.services import create_audit_log
+        create_audit_log(actor=request.user, action="contract_paused", target=contract, summary=f"Paused contract {contract.title}")
+        
+        return success_response(
+            data=ContractDetailSerializer(contract).data,
+            message="Contract paused successfully",
+        )
+
+    @action(detail=True, methods=["post"], url_path="unpause")
+    def unpause_action(self, request, id=None):
+        contract = self.get_object()
+        if request.user.role != UserRole.COMPANY and not request.user.is_superuser:
+            return Response({"success": False, "message": "Only companies can unpause contracts."}, status=status.HTTP_403_FORBIDDEN)
+        contract = unpause_contract(contract)
+        
+        from apps.common.services import create_audit_log
+        create_audit_log(actor=request.user, action="contract_unpaused", target=contract, summary=f"Unpaused contract {contract.title}")
+        
+        return success_response(
+            data=ContractDetailSerializer(contract).data,
+            message="Contract unpaused successfully",
+        )

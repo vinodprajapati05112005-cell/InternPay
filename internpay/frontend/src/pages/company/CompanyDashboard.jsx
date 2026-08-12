@@ -326,6 +326,20 @@ const CompanyDashboard = () => {
                     Create Contract
                   </Link>
                   <Link
+                    to="/company/contracts"
+                    className="flex items-center gap-3 w-full px-4 py-3 bg-slate-50 text-slate-700 rounded-xl font-semibold text-sm hover:bg-slate-100 transition-colors border border-slate-200"
+                  >
+                    <Lock className="w-4 h-4" />
+                    Lock Funds (Fund Contracts)
+                  </Link>
+                  <Link
+                    to="/company/contracts"
+                    className="flex items-center gap-3 w-full px-4 py-3 bg-rose-50 text-rose-700 rounded-xl font-semibold text-sm hover:bg-rose-100 transition-colors border border-rose-200"
+                  >
+                    <AlertTriangle className="w-4 h-4" />
+                    Stop Fund Releasing (Pause)
+                  </Link>
+                  <Link
                     to="/company/submissions"
                     className="flex items-center gap-3 w-full px-4 py-3 bg-slate-50 text-slate-700 rounded-xl font-semibold text-sm hover:bg-slate-100 transition-colors border border-slate-200"
                   >

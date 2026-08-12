@@ -281,3 +281,21 @@ def get_contract_dashboard(company) -> dict:
         "total_value": aggregates["total_value"] or Decimal("0.00"),
         "recent_contracts": recent,
     }
+
+
+@transaction.atomic
+def pause_contract(contract: Contract) -> Contract:
+    if contract.is_paused:
+        raise ValidationError({"detail": "Contract is already paused."})
+    contract.is_paused = True
+    contract.save(update_fields=["is_paused", "updated_at"])
+    return contract
+
+
+@transaction.atomic
+def unpause_contract(contract: Contract) -> Contract:
+    if not contract.is_paused:
+        raise ValidationError({"detail": "Contract is not paused."})
+    contract.is_paused = False
+    contract.save(update_fields=["is_paused", "updated_at"])
+    return contract

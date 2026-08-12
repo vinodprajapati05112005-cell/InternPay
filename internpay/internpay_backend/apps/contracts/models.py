@@ -44,6 +44,7 @@ class Contract(BaseModel):
     chain_reference = models.CharField(max_length=255, blank=True, default="")
     metadata = models.JSONField(default=dict, blank=True)
     notes = models.TextField(blank=True, default="")
+    is_paused = models.BooleanField(default=False)
 
     class Meta:
         indexes = [

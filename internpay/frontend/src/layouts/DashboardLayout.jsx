@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, FileText, CheckSquare, Scale, Settings, User, LogOut, Menu, X, Bell } from 'lucide-react';
+import { LayoutDashboard, FileText, CheckSquare, Scale, Settings, User, LogOut, Menu, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { getRoleLabel, getUserDisplayName, getUserInitial } from '../utils/navigation';
+import NotificationDropdown from '../components/NotificationDropdown';
 
 const DashboardLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -142,10 +143,7 @@ const DashboardLayout = () => {
           <div className="flex-1"></div>
           
           <div className="flex items-center gap-4">
-            <button className="relative p-2 text-slate-400 hover:text-slate-600 transition-colors">
-              <Bell size={20} />
-              <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-            </button>
+            <NotificationDropdown />
             <div className="px-3 py-1.5 bg-green-50 text-green-700 border border-green-200 rounded-full text-xs font-medium flex items-center gap-1.5 shadow-sm">
               <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>
               {displayName}

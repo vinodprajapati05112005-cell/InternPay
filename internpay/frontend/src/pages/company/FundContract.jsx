@@ -321,6 +321,34 @@ const FundContract = () => {
               </div>
             ) : (
               <div className="space-y-4">
+                {/* --- Blockchain Integration Placeholder --- */}
+                <div className="p-4 bg-indigo-50 border border-indigo-200 rounded-xl mb-6">
+                  <h3 className="text-sm font-semibold text-indigo-900 mb-2 flex items-center gap-2">
+                    <Globe className="w-4 h-4" />
+                    Lock Funds via Blockchain
+                  </h3>
+                  <p className="text-xs text-indigo-700 mb-4">
+                    Securely lock the ETH in the InternPayEscrow smart contract. Once completed, the transaction hash will be filled automatically.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      // TODO for blockchain team: Integrate ethers.js/wagmi here
+                      // Example:
+                      // const tx = await escrowContract.lockFunds(contract.id, { value: totalWei });
+                      // await tx.wait();
+                      // setTransactionHash(tx.hash);
+                      alert('Blockchain logic placeholder. Please integrate ethers.js to call lockFunds() here.');
+                      setTransactionHash('0x' + Array(64).fill(0).map(() => Math.floor(Math.random() * 16).toString(16)).join(''));
+                    }}
+                    className="w-full py-2.5 bg-indigo-600 text-white rounded-xl font-semibold text-sm hover:bg-indigo-700 transition-colors shadow flex items-center justify-center gap-2"
+                  >
+                    <Lock className="w-4 h-4" />
+                    Lock {formatCurrency(total)} ETH via Web3
+                  </button>
+                </div>
+                {/* -------------------------------------- */}
+
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-1.5">Transaction hash (required)</label>
                   <input

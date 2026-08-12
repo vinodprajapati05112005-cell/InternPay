@@ -48,6 +48,25 @@ const CompanyContractDetails = () => {
   const [isAssigning, setIsAssigning] = useState(false);
   const [assignError, setAssignError] = useState('');
   const [assignSuccess, setAssignSuccess] = useState('');
+  const [isPausing, setIsPausing] = useState(false);
+  const [pauseError, setPauseError] = useState('');
+
+  const handleTogglePause = async () => {
+    setIsPausing(true);
+    setPauseError('');
+    try {
+      if (contract.is_paused) {
+        await contractApi.unpause(id);
+      } else {
+        await contractApi.pause(id);
+      }
+      await reloadContract();
+    } catch (err) {
+      setPauseError(err?.message || `Failed to ${contract.is_paused ? 'resume' : 'pause'} contract.`);
+    } finally {
+      setIsPausing(false);
+    }
+  };
 
   const reloadContract = async () => {
     try {
@@ -163,6 +182,15 @@ const CompanyContractDetails = () => {
           </div>
         )}
 
+        {pauseError && (
+          <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700 flex items-center justify-between">
+            <span>{pauseError}</span>
+            <button onClick={() => setPauseError('')} className="text-rose-500 hover:text-rose-700">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-3 flex-wrap">
@@ -170,6 +198,11 @@ const CompanyContractDetails = () => {
               <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold border ${statusColors[contract.status] || 'bg-slate-50 text-slate-600 border-slate-200'}`}>
                 {humanizeEnum(contract.status)}
               </span>
+              {contract.is_paused && (
+                <span className="inline-flex items-center gap-1 px-3 py-1 bg-rose-100 text-rose-700 border border-rose-200 rounded-full text-xs font-bold">
+                  <AlertTriangle className="w-3.5 h-3.5" /> PAUSED
+                </span>
+              )}
             </div>
             <p className="text-slate-500 mt-1">{contract.id}</p>
           </div>
@@ -189,6 +222,26 @@ const CompanyContractDetails = () => {
               >
                 <Lock className="w-4 h-4" /> Fund Contract
               </Link>
+            )}
+            {['FUNDED', 'IN_PROGRESS', 'SUBMITTED'].includes(contract.status) && (
+              <button
+                onClick={handleTogglePause}
+                disabled={isPausing}
+                className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm shadow-lg transition-all disabled:opacity-60 ${
+                  contract.is_paused 
+                    ? 'bg-emerald-600 text-white hover:bg-emerald-700' 
+                    : 'bg-rose-600 text-white hover:bg-rose-700'
+                }`}
+              >
+                {isPausing ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : contract.is_paused ? (
+                  <Zap className="w-4 h-4" />
+                ) : (
+                  <AlertTriangle className="w-4 h-4" />
+                )}
+                {contract.is_paused ? 'Resume Contract' : 'Pause Contract'}
+              </button>
             )}
           </div>
         </div>
