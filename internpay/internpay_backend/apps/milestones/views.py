@@ -64,6 +64,10 @@ class MilestoneViewSet(viewsets.ModelViewSet):
 
     def update(self, request, *args, **kwargs):
         milestone = self.get_object()
+        if request.user.role != UserRole.COMPANY and not request.user.is_superuser:
+            return success_response(message="Only companies can edit milestones.", status_code=status.HTTP_403_FORBIDDEN)
+        if milestone.contract.status not in {ContractStatus.DRAFT, ContractStatus.PENDING}:
+            return success_response(message="Cannot edit milestones on an active or funded contract.", status_code=status.HTTP_400_BAD_REQUEST)
         serializer = MilestoneWriteSerializer(data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         milestone = update_milestone(milestone, serializer.validated_data)
@@ -74,5 +78,9 @@ class MilestoneViewSet(viewsets.ModelViewSet):
 
     def destroy(self, request, *args, **kwargs):
         milestone = self.get_object()
+        if request.user.role != UserRole.COMPANY and not request.user.is_superuser:
+            return success_response(message="Only companies can delete milestones.", status_code=status.HTTP_403_FORBIDDEN)
+        if milestone.contract.status not in {ContractStatus.DRAFT, ContractStatus.PENDING}:
+            return success_response(message="Cannot delete milestones on an active or funded contract.", status_code=status.HTTP_400_BAD_REQUEST)
         milestone.delete()
         return success_response(message="Milestone deleted successfully")

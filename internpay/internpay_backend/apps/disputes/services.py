@@ -176,13 +176,26 @@ def resolve_dispute(*, dispute: Dispute, judge, validated_data: dict, request=No
     dispute.resolved_at = timezone.now()
     dispute.transaction_hash = transaction_hash
     dispute.resolution_amount = resolution_amount
-    dispute.judge_reward = (resolution_amount * Decimal("0.025")).quantize(AMOUNT_QUANTUM)
     dispute.save()
+
+    milestone = dispute.submission.milestone
+    from apps.common.choices import MilestoneStatus
+    if decision in {DisputeDecision.RELEASE_PAYMENT, DisputeDecision.PARTIAL_PAYMENT}:
+        milestone.status = MilestoneStatus.APPROVED
+    elif decision == DisputeDecision.REFUND_COMPANY:
+        milestone.status = MilestoneStatus.REJECTED
+    milestone.save(update_fields=["status", "updated_at"])
 
     contract = dispute.contract
     contract.released_amount = min(contract.total_amount, contract.released_amount + resolution_amount)
-    contract.status = ContractStatus.COMPLETED
-    contract.completed_at = timezone.now()
+    all_done = not contract.milestones.exclude(
+        status__in=[MilestoneStatus.APPROVED, MilestoneStatus.REJECTED, MilestoneStatus.CANCELLED]
+    ).exists()
+    if all_done:
+        contract.status = ContractStatus.COMPLETED
+        contract.completed_at = timezone.now()
+    else:
+        contract.status = ContractStatus.ACTIVE
     contract.save(update_fields=["released_amount", "status", "completed_at", "updated_at"])
 
     submission = dispute.submission
