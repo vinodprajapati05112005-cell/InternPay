@@ -71,3 +71,28 @@ class ContractAssignStudentTests(TestCase):
 
         self.assertEqual(response.status_code, 400)
         self.assertIn("Only draft or pending contracts can be assigned.", response.data["message"])
+
+
+class ContractDashboardTests(TestCase):
+    def test_company_dashboard_returns_summary(self):
+        user = User.objects.create_user(
+            email="dashboard-company@example.com",
+            password="StrongPass123!",
+            role=UserRole.COMPANY,
+        )
+        company = user.company_profile
+        Contract.objects.create(
+            company=company,
+            title="Dashboard contract",
+            description="Dashboard coverage",
+            total_amount=Decimal("250.00"),
+        )
+
+        client = APIClient()
+        client.force_authenticate(user=user)
+        response = client.get("/api/contracts/dashboard/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data["success"])
+        self.assertEqual(response.data["data"]["total_contracts"], 1)
+        self.assertEqual(response.data["data"]["total_value"], "250.00")

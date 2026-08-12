@@ -23,6 +23,7 @@ from apps.contracts.serializers import (
     ContractAddMilestonesSerializer,
     ContractAssignStudentSerializer,
     ContractCancelSerializer,
+    ContractDashboardSerializer,
     ContractDetailSerializer,
     ContractWriteSerializer,
 )
