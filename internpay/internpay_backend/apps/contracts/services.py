@@ -161,6 +161,7 @@ def update_contract(contract: Contract, validated_data: dict) -> Contract:
 
 @transaction.atomic
 def delete_contract(contract: Contract) -> None:
+    _ensure_editable(contract, "deleted")
     contract.delete()
 
 
@@ -229,8 +230,11 @@ def cancel_contract(contract: Contract, reason: str = "") -> Contract:
         pass
     return contract
 def fund_contract(contract: Contract, transaction_hash: str = "", reference: str = "") -> Contract:
-    if contract.status != ContractStatus.ACTIVE:
-        raise ValidationError({"detail": "Only active contracts can be funded."})
+    if contract.status in {ContractStatus.FUNDED, ContractStatus.COMPLETED, ContractStatus.CANCELLED, ContractStatus.ARCHIVED}:
+        raise ValidationError({"detail": f"This contract cannot be funded because it is already {contract.status.lower()}."})
+
+    if contract.status not in {ContractStatus.ACTIVE, ContractStatus.PENDING, ContractStatus.DRAFT, ContractStatus.FUNDING_REQUIRED}:
+        raise ValidationError({"detail": "Only active, pending, or draft contracts can be funded."})
 
     clean_tx = transaction_hash.strip()
     if not clean_tx:
@@ -255,6 +259,18 @@ def fund_contract(contract: Contract, transaction_hash: str = "", reference: str
         contract.funded_at = timezone.now()
         contract.status = ContractStatus.FUNDED
         contract.save(update_fields=["funded_amount", "funded_at", "status", "chain_reference", "metadata", "updated_at"])
+
+        if contract.student:
+            run_after_commit(
+                lambda: create_notification(
+                    user=contract.student.user,
+                    title="Escrow funded",
+                    message=f"The escrow funds for contract '{contract.title}' have been locked on-chain. You can now begin work and submit milestones.",
+                    notification_type="CONTRACT_UPDATE",
+                    channel="BOTH",
+                ),
+                label="student escrow funded notification",
+            )
 
     return contract
 def get_contract_dashboard(company) -> dict:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from decimal import Decimal
+import logging
 from pathlib import Path
 
 from django.db import transaction
@@ -10,6 +11,8 @@ from rest_framework.exceptions import ValidationError
 from apps.common.choices import ContractStatus, MilestoneStatus, NotificationType, SubmissionStatus
 from apps.common.services import create_audit_log, create_notification, run_after_commit
 from apps.submissions.models import AIReport, Submission, SubmissionFile
+
+logger = logging.getLogger(__name__)
 
 
 def _file_type_from_name(name: str) -> str:
@@ -110,7 +113,14 @@ def create_submission(*, student, validated_data: dict, request=None) -> Submiss
     milestone.save(update_fields=["status", "submitted_at", "updated_at"])
 
     from apps.ai_engine.services import evaluate_submission_with_ai
-    run_after_commit(lambda: evaluate_submission_with_ai(submission=submission), label="AI evaluation")
+
+    def _trigger_ai_evaluation():
+        try:
+            evaluate_submission_with_ai(submission=submission, request=request)
+        except Exception as exc:
+            logger.warning("Automatic AI evaluation failed on create_submission for %s: %s", submission.id, exc)
+
+    run_after_commit(_trigger_ai_evaluation, label="AI evaluation")
 
     return submission
 
@@ -126,7 +136,14 @@ def update_submission(*, submission: Submission, validated_data: dict, request=N
     _store_files(submission, files)
 
     from apps.ai_engine.services import evaluate_submission_with_ai
-    run_after_commit(lambda: evaluate_submission_with_ai(submission=submission, force=True), label="AI evaluation")
+
+    def _trigger_ai_reevaluation():
+        try:
+            evaluate_submission_with_ai(submission=submission, request=request, force=True)
+        except Exception as exc:
+            logger.warning("Automatic AI re-evaluation failed on update_submission for %s: %s", submission.id, exc)
+
+    run_after_commit(_trigger_ai_reevaluation, label="AI evaluation")
 
     return submission
 
