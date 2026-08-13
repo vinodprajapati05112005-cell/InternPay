@@ -48,6 +48,7 @@ class SubmissionCreateSerializer(serializers.Serializer):
     documentation_url = serializers.URLField(required=False, allow_blank=True)
     video_url = serializers.URLField(required=False, allow_blank=True)
     additional_notes = serializers.CharField(required=False, allow_blank=True)
+    transaction_hash = serializers.CharField(required=False, allow_blank=True)
     files = serializers.ListField(child=serializers.FileField(), required=False)
 
     def validate(self, attrs):
@@ -86,6 +87,7 @@ class SubmissionUpdateSerializer(serializers.Serializer):
     documentation_url = serializers.URLField(required=False, allow_blank=True)
     video_url = serializers.URLField(required=False, allow_blank=True)
     additional_notes = serializers.CharField(required=False, allow_blank=True)
+    transaction_hash = serializers.CharField(required=False, allow_blank=True)
     files = serializers.ListField(child=serializers.FileField(), required=False)
 
     def validate(self, attrs):
@@ -122,10 +124,12 @@ class SubmissionDetailSerializer(BaseModelSerializer):
     ai_report = AIReportSerializer(read_only=True)
     contract_title = serializers.SerializerMethodField()
     milestone_title = serializers.SerializerMethodField()
+    milestone_order = serializers.SerializerMethodField()
     student_name = serializers.SerializerMethodField()
     company_name = serializers.SerializerMethodField()
     contract_status = serializers.SerializerMethodField()
     milestone_status = serializers.SerializerMethodField()
+    contract_metadata = serializers.SerializerMethodField()
     ai_score = serializers.SerializerMethodField()
     ai_recommendation = serializers.SerializerMethodField()
     links = serializers.SerializerMethodField()
@@ -139,10 +143,12 @@ class SubmissionDetailSerializer(BaseModelSerializer):
             "student",
             "contract_title",
             "milestone_title",
+            "milestone_order",
             "student_name",
             "company_name",
             "contract_status",
             "milestone_status",
+            "contract_metadata",
             "github_url",
             "demo_url",
             "figma_url",
@@ -169,6 +175,9 @@ class SubmissionDetailSerializer(BaseModelSerializer):
     def get_milestone_title(self, obj):
         return obj.milestone.title
 
+    def get_milestone_order(self, obj):
+        return obj.milestone.order
+
     def get_student_name(self, obj):
         return obj.student.user.get_full_name() or obj.student.user.email
 
@@ -180,6 +189,9 @@ class SubmissionDetailSerializer(BaseModelSerializer):
 
     def get_milestone_status(self, obj):
         return obj.milestone.status
+
+    def get_contract_metadata(self, obj):
+        return obj.contract.metadata or {}
 
     def get_ai_score(self, obj):
         report = getattr(obj, "ai_report", None)
@@ -203,6 +215,7 @@ class SubmissionDetailSerializer(BaseModelSerializer):
 class SubmissionListSerializer(serializers.ModelSerializer):
     contract_title = serializers.SerializerMethodField()
     milestone_title = serializers.SerializerMethodField()
+    milestone_order = serializers.SerializerMethodField()
     student_name = serializers.SerializerMethodField()
     company_name = serializers.SerializerMethodField()
     ai_score = serializers.SerializerMethodField()
@@ -218,6 +231,7 @@ class SubmissionListSerializer(serializers.ModelSerializer):
             "student",
             "contract_title",
             "milestone_title",
+            "milestone_order",
             "student_name",
             "company_name",
             "status",
@@ -235,6 +249,9 @@ class SubmissionListSerializer(serializers.ModelSerializer):
 
     def get_milestone_title(self, obj):
         return obj.milestone.title
+
+    def get_milestone_order(self, obj):
+        return obj.milestone.order
 
     def get_student_name(self, obj):
         return obj.student.user.get_full_name() or obj.student.user.email

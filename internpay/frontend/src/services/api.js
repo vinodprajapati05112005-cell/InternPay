@@ -318,6 +318,11 @@ export const contractApi = {
   dashboard: () => api.get('/api/contracts/dashboard/'),
 };
 
+export const milestoneApi = {
+  list: () => api.get('/api/milestones/'),
+  detail: (id) => api.get(`/api/milestones/${id}/`),
+  release: (id, data = {}) => api.post(`/api/milestones/${id}/release/`, data),
+};
 
 export const submissionApi = {
   list: () => api.get('/api/submissions/'),

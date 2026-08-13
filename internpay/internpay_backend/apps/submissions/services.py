@@ -48,6 +48,7 @@ def create_submission(*, student, validated_data: dict, request=None) -> Submiss
     from apps.milestones.models import Milestone
 
     files = validated_data.pop("files", [])
+    transaction_hash = validated_data.pop("transaction_hash", "")
     contract_id = validated_data.pop("contract_id")
     milestone_id = validated_data.pop("milestone_id")
 
@@ -89,6 +90,7 @@ def create_submission(*, student, validated_data: dict, request=None) -> Submiss
         contract=contract,
         milestone=milestone,
         student=student,
+        transaction_hash=transaction_hash,
         status=SubmissionStatus.SUBMITTED,
         **validated_data,
     )
@@ -128,6 +130,8 @@ def create_submission(*, student, validated_data: dict, request=None) -> Submiss
 @transaction.atomic
 def update_submission(*, submission: Submission, validated_data: dict, request=None) -> Submission:
     files = validated_data.pop("files", [])
+    if "transaction_hash" in validated_data:
+        submission.transaction_hash = validated_data.pop("transaction_hash")
     for field in ["github_url", "demo_url", "figma_url", "documentation_url", "video_url", "additional_notes"]:
         if field in validated_data:
             setattr(submission, field, validated_data[field])

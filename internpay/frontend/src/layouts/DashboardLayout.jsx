@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, FileText, CheckSquare, Scale, Settings, User, LogOut, Menu, X } from 'lucide-react';
+import { LayoutDashboard, FileText, CheckSquare, Scale, Settings, User, LogOut, Menu, X, Wallet } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { getRoleLabel, getUserDisplayName, getUserInitial } from '../utils/navigation';
 import NotificationDropdown from '../components/NotificationDropdown';
@@ -143,6 +143,13 @@ const DashboardLayout = () => {
           <div className="flex-1"></div>
           
           <div className="flex items-center gap-4">
+            <Link
+              to="/connect-wallet"
+              className="hidden sm:inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-slate-200 bg-slate-50 text-slate-700 text-sm font-medium hover:bg-slate-100 transition-colors"
+            >
+              <Wallet size={16} />
+              Connect Wallet
+            </Link>
             <NotificationDropdown />
             <div className="px-3 py-1.5 bg-green-50 text-green-700 border border-green-200 rounded-full text-xs font-medium flex items-center gap-1.5 shadow-sm">
               <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>

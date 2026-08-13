@@ -229,7 +229,7 @@ def cancel_contract(contract: Contract, reason: str = "") -> Contract:
         # ==========================================
         pass
     return contract
-def fund_contract(contract: Contract, transaction_hash: str = "", reference: str = "") -> Contract:
+def fund_contract(contract: Contract, transaction_hash: str = "", reference: str = "", escrow_id: str = "") -> Contract:
     if contract.status in {ContractStatus.FUNDED, ContractStatus.COMPLETED, ContractStatus.CANCELLED, ContractStatus.ARCHIVED}:
         raise ValidationError({"detail": f"This contract cannot be funded because it is already {contract.status.lower()}."})
 
@@ -253,8 +253,12 @@ def fund_contract(contract: Contract, transaction_hash: str = "", reference: str
 
     with transaction.atomic():
         contract.chain_reference = clean_tx
+        metadata = dict(contract.metadata or {})
         if reference:
-            contract.metadata = {**(contract.metadata or {}), "reference": reference.strip()}
+            metadata["reference"] = reference.strip()
+        if escrow_id:
+            metadata["escrow_id"] = str(escrow_id).strip()
+        contract.metadata = metadata
         contract.funded_amount = contract.total_amount
         contract.funded_at = timezone.now()
         contract.status = ContractStatus.FUNDED

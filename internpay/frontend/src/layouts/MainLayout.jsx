@@ -1,10 +1,13 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Outlet, Link } from 'react-router-dom';
 import { Menu, X } from 'lucide-react';
-import { useState } from 'react';
+import { useAuth } from '../context/AuthContext';
+import { getDashboardPath } from '../utils/navigation';
 
 const MainLayout = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { isAuthenticated, user } = useAuth();
+  const dashboardPath = getDashboardPath(user?.role);
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900 font-sans">
@@ -28,9 +31,15 @@ const MainLayout = () => {
             <Link to="/connect-wallet" className="px-4 py-2 text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50 font-medium transition-colors text-sm">
               Connect Wallet
             </Link>
-            <Link to="/select-role" className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg shadow-md hover:shadow-lg transition-all text-sm">
-              Get Started
-            </Link>
+            {isAuthenticated ? (
+              <Link to={dashboardPath} className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg shadow-md hover:shadow-lg transition-all text-sm">
+                Dashboard
+              </Link>
+            ) : (
+              <Link to="/select-role" className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg shadow-md hover:shadow-lg transition-all text-sm">
+                Get Started
+              </Link>
+            )}
           </div>
 
           {/* Mobile menu button */}
@@ -55,9 +64,15 @@ const MainLayout = () => {
             <Link to="/connect-wallet" onClick={() => setMobileMenuOpen(false)} className="text-center px-4 py-3 text-slate-700 border border-slate-300 rounded-lg font-medium">
               Connect Wallet
             </Link>
-            <Link to="/select-role" onClick={() => setMobileMenuOpen(false)} className="text-center px-5 py-3 bg-blue-600 text-white font-medium rounded-lg">
-              Get Started
-            </Link>
+            {isAuthenticated ? (
+              <Link to={dashboardPath} onClick={() => setMobileMenuOpen(false)} className="text-center px-5 py-3 bg-blue-600 text-white font-medium rounded-lg">
+                Dashboard
+              </Link>
+            ) : (
+              <Link to="/select-role" onClick={() => setMobileMenuOpen(false)} className="text-center px-5 py-3 bg-blue-600 text-white font-medium rounded-lg">
+                Get Started
+              </Link>
+            )}
           </div>
         )}
       </header>

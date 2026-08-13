@@ -16,6 +16,8 @@ import {
   Wallet,
   Zap,
 } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
+import { getDashboardPath } from '../../utils/navigation';
 import {
   clearStoredWalletSession,
   formatWeiToEth,
@@ -97,6 +99,7 @@ const buildWalletSession = async (walletId) => {
 };
 
 const ConnectWallet = () => {
+  const { isAuthenticated, user } = useAuth();
   const [walletSession, setWalletSession] = useState(() => getStoredWalletSession());
   const [connectingWalletId, setConnectingWalletId] = useState(null);
   const [switchingNetwork, setSwitchingNetwork] = useState(false);
@@ -108,6 +111,8 @@ const ConnectWallet = () => {
   const wrongNetwork = connected && isWrongNetwork(walletSession?.chainId);
   const expectedChainLabel = getExpectedChainLabel();
   const expectedChainId = getExpectedChainId();
+  const nextPath = isAuthenticated ? getDashboardPath(user?.role) : '/select-role';
+  const nextLabel = isAuthenticated ? 'Continue to Dashboard' : 'Continue to Role Selection';
   const activeWallet = useMemo(() => {
     if (!walletSession?.walletId) {
       return null;
@@ -412,7 +417,7 @@ const ConnectWallet = () => {
 
                 <div className="space-y-3">
                   <Link
-                    to="/select-role"
+                    to={nextPath}
                     aria-disabled={wrongNetwork}
                     tabIndex={wrongNetwork ? -1 : 0}
                     className={`w-full py-3 rounded-xl font-semibold shadow-lg shadow-blue-500/25 transition-all flex items-center justify-center gap-2 ${
@@ -421,7 +426,7 @@ const ConnectWallet = () => {
                         : 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:shadow-xl hover:shadow-blue-500/30'
                     }`}
                   >
-                    Continue to Role Selection
+                    {nextLabel}
                     <ArrowRight className="w-5 h-5" />
                   </Link>
                   {wrongNetwork && (

@@ -39,6 +39,7 @@ from internpay.utils.responses import success_response
 class ContractFundSerializer(serializers.Serializer):
     transaction_hash = serializers.CharField(required=False, allow_blank=True)
     reference = serializers.CharField(required=False, allow_blank=True)
+    escrow_id = serializers.CharField(required=False, allow_blank=True)
 
 
 class ContractViewSet(viewsets.ModelViewSet):
@@ -171,6 +172,7 @@ class ContractViewSet(viewsets.ModelViewSet):
             contract,
             transaction_hash=serializer.validated_data.get("transaction_hash", ""),
             reference=serializer.validated_data.get("reference", ""),
+            escrow_id=serializer.validated_data.get("escrow_id", ""),
         )
         return success_response(
             data=ContractDetailSerializer(contract).data,

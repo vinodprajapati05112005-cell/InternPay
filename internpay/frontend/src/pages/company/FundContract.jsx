@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { contractApi } from '../../services/api';
 import { formatCurrency, formatDate, humanizeEnum } from '../../utils/formatters';
+import { getEscrowExplorerTxUrl, hasEscrowContractConfig, lockExistingEscrowFunds } from '../../utils/blockchain';
 
 const PLATFORM_FEE_RATE = 0.025;
 
@@ -55,6 +56,8 @@ const FundContract = () => {
   const [transactionHash, setTransactionHash] = useState('');
   const [reference, setReference] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const [escrowError, setEscrowError] = useState('');
+  const [isLockingOnChain, setIsLockingOnChain] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -91,10 +94,13 @@ const FundContract = () => {
   const contractAmount = Number(contract?.total_amount || 0);
   const platformFee = contractAmount * PLATFORM_FEE_RATE;
   const total = contractAmount + platformFee;
+  const escrowId = contract?.metadata?.escrow_id || contract?.metadata?.escrowId || '';
+  const hasOnChainEscrow = Boolean(escrowId && hasEscrowContractConfig());
   const milestones = contract?.milestones || [];
   const completedMilestones = contract?.completed_milestones ?? milestones.filter((milestone) => milestone.status === 'APPROVED').length;
   const milestoneCount = contract?.milestone_count ?? milestones.length;
   const hasReference = Boolean(transactionHash.trim() || reference.trim());
+  const lockTxUrl = getEscrowExplorerTxUrl(transactionHash);
 
   const stepStates = useMemo(() => {
     const fundingComplete = isAlreadyFunded || Boolean(successMessage);
@@ -119,6 +125,7 @@ const FundContract = () => {
       const updated = await contractApi.fund(contract.id, {
         transaction_hash: transactionHash.trim(),
         reference: reference.trim(),
+        escrow_id: escrowId,
       });
 
       setContract(updated || null);
@@ -127,6 +134,38 @@ const FundContract = () => {
       setError(saveError?.message || 'Unable to fund the contract.');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleLockOnChain = async () => {
+    if (!contract || !hasOnChainEscrow || isAlreadyFunded) {
+      return;
+    }
+
+    setEscrowError('');
+    setIsLockingOnChain(true);
+    setError('');
+    setSuccessMessage('');
+
+    try {
+      const lockResult = await lockExistingEscrowFunds({
+        escrowId,
+        totalAmountEth: total,
+      });
+
+      setTransactionHash(lockResult.txHash);
+      const updated = await contractApi.fund(contract.id, {
+        transaction_hash: lockResult.txHash,
+        reference: reference.trim() || `Escrow #${escrowId}`,
+        escrow_id: escrowId,
+      });
+
+      setContract(updated || null);
+      setSuccessMessage('Funds locked on-chain and contract marked as funded.');
+    } catch (lockError) {
+      setEscrowError(lockError?.message || 'Unable to lock funds on-chain.');
+    } finally {
+      setIsLockingOnChain(false);
     }
   };
 
@@ -188,6 +227,13 @@ const FundContract = () => {
         <div className="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4" />
           {successMessage}
+        </div>
+      )}
+
+      {escrowError && (
+        <div className="mb-6 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 flex items-center gap-2">
+          <AlertCircle className="w-4 h-4" />
+          {escrowError}
         </div>
       )}
 
@@ -321,33 +367,43 @@ const FundContract = () => {
               </div>
             ) : (
               <div className="space-y-4">
-                {/* --- Blockchain Integration Placeholder --- */}
                 <div className="p-4 bg-indigo-50 border border-indigo-200 rounded-xl mb-6">
                   <h3 className="text-sm font-semibold text-indigo-900 mb-2 flex items-center gap-2">
                     <Globe className="w-4 h-4" />
                     Lock Funds via Blockchain
                   </h3>
                   <p className="text-xs text-indigo-700 mb-4">
-                    Securely lock the ETH in the InternPayEscrow smart contract. Once completed, the transaction hash will be filled automatically.
+                    {hasOnChainEscrow
+                      ? 'Use the connected wallet to lock the ETH in the escrow contract. The transaction hash will be recorded automatically.'
+                      : 'Create the escrow contract first so the funds can be locked on-chain from this page.'}
                   </p>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      // TODO for blockchain team: Integrate ethers.js/wagmi here
-                      // Example:
-                      // const tx = await escrowContract.lockFunds(contract.id, { value: totalWei });
-                      // await tx.wait();
-                      // setTransactionHash(tx.hash);
-                      alert('Blockchain logic placeholder. Please integrate ethers.js to call lockFunds() here.');
-                      setTransactionHash('0x' + Array(64).fill(0).map(() => Math.floor(Math.random() * 16).toString(16)).join(''));
-                    }}
-                    className="w-full py-2.5 bg-indigo-600 text-white rounded-xl font-semibold text-sm hover:bg-indigo-700 transition-colors shadow flex items-center justify-center gap-2"
-                  >
-                    <Lock className="w-4 h-4" />
-                    Lock {formatCurrency(total)} ETH via Web3
-                  </button>
+                  {hasOnChainEscrow ? (
+                    <button
+                      type="button"
+                      onClick={() => void handleLockOnChain()}
+                      disabled={isLockingOnChain}
+                      className="w-full py-2.5 bg-indigo-600 text-white rounded-xl font-semibold text-sm hover:bg-indigo-700 transition-colors shadow flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                      {isLockingOnChain ? <Loader2 className="w-4 h-4 animate-spin" /> : <Lock className="w-4 h-4" />}
+                      Lock {formatCurrency(total)} ETH via Web3
+                    </button>
+                  ) : (
+                    <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                      Missing <code className="font-mono">escrow_id</code> or blockchain contract config.
+                    </div>
+                  )}
+                  {transactionHash && lockTxUrl && (
+                    <a
+                      href={lockTxUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-indigo-700 hover:text-indigo-900"
+                    >
+                      View lock transaction on explorer
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  )}
                 </div>
-                {/* -------------------------------------- */}
 
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-1.5">Transaction hash (required)</label>
@@ -374,7 +430,7 @@ const FundContract = () => {
                 <button
                   type="button"
                   onClick={handleFund}
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || !transactionHash.trim()}
                   className="w-full py-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl font-semibold text-sm hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                   {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Lock className="w-4 h-4" />}

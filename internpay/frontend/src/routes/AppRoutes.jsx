@@ -81,9 +81,10 @@ const AppRoutes = () => {
       <Route element={<ProtectedRoute guestOnly />}>
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
-        <Route path="/connect-wallet" element={<ConnectWallet />} />
         <Route path="/select-role" element={<SelectRole />} />
       </Route>
+
+      <Route path="/connect-wallet" element={<ConnectWallet />} />
 
       {/* Dashboard Layout Routes */}
       <Route element={<ProtectedRoute />}>

@@ -1,16 +1,23 @@
 from __future__ import annotations
 
 from django.shortcuts import get_object_or_404
-from rest_framework import status, viewsets
+from rest_framework import serializers, status, viewsets
+from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 
-from apps.common.choices import UserRole
+from apps.common.choices import ContractStatus, UserRole
 from apps.contracts.models import Contract
+from apps.contracts.serializers import ContractDetailSerializer
 from apps.milestones.models import Milestone
 from apps.milestones.permissions import IsMilestoneParticipantOrAdmin
 from apps.milestones.serializers import MilestoneSerializer, MilestoneWriteSerializer
-from apps.milestones.services import create_milestone, update_milestone
+from apps.milestones.services import create_milestone, release_milestone_payment, update_milestone
 from internpay.utils.responses import success_response
+
+
+class MilestoneReleaseSerializer(serializers.Serializer):
+    transaction_hash = serializers.CharField(required=False, allow_blank=True)
+    reference = serializers.CharField(required=False, allow_blank=True)
 
 
 class MilestoneViewSet(viewsets.ModelViewSet):
@@ -84,3 +91,27 @@ class MilestoneViewSet(viewsets.ModelViewSet):
             return success_response(message="Cannot delete milestones on an active or funded contract.", status_code=status.HTTP_400_BAD_REQUEST)
         milestone.delete()
         return success_response(message="Milestone deleted successfully")
+
+    @action(detail=True, methods=["post"], url_path="release")
+    def release_action(self, request, id=None):
+        milestone = self.get_object()
+        if request.user.role != UserRole.COMPANY and not request.user.is_superuser:
+            return success_response(message="Only companies can release milestone funds.", status_code=status.HTTP_403_FORBIDDEN)
+
+        serializer = MilestoneReleaseSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        contract, milestone = release_milestone_payment(
+            milestone,
+            actor=request.user,
+            transaction_hash=serializer.validated_data.get("transaction_hash", ""),
+            reference=serializer.validated_data.get("reference", ""),
+        )
+
+        return success_response(
+            data={
+                "contract": ContractDetailSerializer(contract).data,
+                "milestone": MilestoneSerializer(milestone).data,
+            },
+            message="Milestone payment released successfully",
+        )

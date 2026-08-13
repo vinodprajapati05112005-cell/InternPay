@@ -15,9 +15,13 @@ import {
   Calendar,
   Loader2,
   Shield,
+  Wallet,
+  AlertCircle,
+  ExternalLink,
 } from 'lucide-react';
 import { contractApi } from '../../services/api';
 import { formatTokenAmount, formatDate, humanizeEnum } from '../../utils/formatters';
+import { createAndLockEscrow, getEscrowExplorerTxUrl, hasEscrowContractConfig } from '../../utils/blockchain';
 
 const CreateContract = () => {
   const [step, setStep] = useState(1);
@@ -26,6 +30,9 @@ const CreateContract = () => {
   const [showSuccess, setShowSuccess] = useState(false);
   const [createdContract, setCreatedContract] = useState(null);
   const [termsAccepted, setTermsAccepted] = useState(false);
+  const [isCreatingEscrow, setIsCreatingEscrow] = useState(false);
+  const [escrowError, setEscrowError] = useState('');
+  const [escrowResult, setEscrowResult] = useState(null);
 
   const [projectData, setProjectData] = useState({
     title: '',
@@ -132,6 +139,44 @@ const CreateContract = () => {
       setErrors({ _form: saveError?.message || 'Unable to create the contract.' });
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleCreateEscrow = async () => {
+    if (!createdContract?.id) {
+      return;
+    }
+
+    setEscrowError('');
+    setIsCreatingEscrow(true);
+    setEscrowResult(null);
+
+    try {
+      const studentWallet = createdContract?.student?.wallet_address || createdContract?.student_wallet_address || '';
+      if (!studentWallet) {
+        throw new Error('A student wallet address is required before locking escrow on-chain.');
+      }
+
+      const judgeWallet = createdContract?.judge?.wallet_address || createdContract?.judge_wallet_address || '';
+      const escrow = await createAndLockEscrow({
+        internAddress: studentWallet,
+        judgeAddress: judgeWallet,
+        totalAmountEth: createdContract?.total_amount || totalAmount,
+        milestones: createdContract?.milestones || milestones,
+      });
+
+      const updatedContract = await contractApi.fund(createdContract.id, {
+        transaction_hash: escrow.lockTxHash,
+        reference: `Escrow #${escrow.escrowId}`,
+        escrow_id: escrow.escrowId,
+      });
+
+      setCreatedContract(updatedContract || createdContract);
+      setEscrowResult(escrow);
+    } catch (escrowCreateError) {
+      setEscrowError(escrowCreateError?.message || 'Unable to create the escrow contract on-chain.');
+    } finally {
+      setIsCreatingEscrow(false);
     }
   };
 
@@ -454,16 +499,67 @@ const CreateContract = () => {
                 <CheckCircle2 className="w-8 h-8 text-emerald-600" />
               </div>
               <h3 className="text-2xl font-extrabold text-slate-900 mb-2">Contract Created!</h3>
-              <p className="text-slate-500 mb-6">Your escrow contract has been created successfully.</p>
+              <p className="text-slate-500 mb-6">Your escrow contract has been created successfully. The popup below is where we lock the funds on-chain.</p>
+
+              {escrowError && (
+                <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-left text-sm text-rose-700 flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                  <span>{escrowError}</span>
+                </div>
+              )}
+
+              {escrowResult && (
+                <div className="mb-5 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-left text-sm text-emerald-800 space-y-2">
+                  <div className="flex items-center gap-2 font-semibold">
+                    <CheckCircle2 className="w-4 h-4" />
+                    Escrow locked on-chain
+                  </div>
+                  <p className="font-mono text-xs break-all">Escrow ID: {escrowResult.escrowId}</p>
+                  <p className="font-mono text-xs break-all">
+                    Funding tx:{' '}
+                    {getEscrowExplorerTxUrl(escrowResult.lockTxHash) ? (
+                      <a
+                        href={getEscrowExplorerTxUrl(escrowResult.lockTxHash)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1 text-emerald-700 hover:text-emerald-900"
+                      >
+                        {escrowResult.lockTxHash}
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                    ) : (
+                      escrowResult.lockTxHash
+                    )}
+                  </p>
+                </div>
+              )}
+
+              {!hasEscrowContractConfig() && !escrowResult && (
+                <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-left text-sm text-amber-700">
+                  Set <code className="font-mono">VITE_ESCROW_CONTRACT_ADDRESS</code> to enable the on-chain popup.
+                </div>
+              )}
+
               <div className="space-y-3">
                 {createdContract?.id && (
                   <Link to={`/company/contracts/${createdContract.id}`} className="block w-full py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl font-semibold text-sm hover:from-blue-700 hover:to-indigo-700 shadow-lg transition-all">
                     View Contract Details
                   </Link>
                 )}
+                {createdContract?.id && !createdContract?.funded_at && !escrowResult && (
+                  <button
+                    type="button"
+                    onClick={() => void handleCreateEscrow()}
+                    disabled={isCreatingEscrow || !hasEscrowContractConfig()}
+                    className="block w-full py-3 bg-white text-slate-700 rounded-xl font-semibold text-sm hover:bg-slate-50 border border-slate-200 transition-colors disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
+                  >
+                    <Wallet className="w-4 h-4" />
+                    {isCreatingEscrow ? 'Creating Escrow...' : 'Create Escrow Contract'}
+                  </button>
+                )}
                 {createdContract?.id && (
-                  <Link to={`/company/contracts/${createdContract.id}/fund`} className="block w-full py-3 bg-white text-slate-700 rounded-xl font-semibold text-sm hover:bg-slate-50 border border-slate-200 transition-colors">
-                    Fund Contract Now
+                  <Link to={`/company/contracts/${createdContract.id}/fund`} className="block w-full py-3 bg-slate-50 text-slate-700 rounded-xl font-semibold text-sm hover:bg-slate-100 border border-slate-200 transition-colors">
+                    Open Funding Page
                   </Link>
                 )}
                 <button onClick={() => setShowSuccess(false)} className="block w-full py-3 bg-slate-50 text-slate-700 rounded-xl font-semibold text-sm hover:bg-slate-100 border border-slate-200 transition-colors">

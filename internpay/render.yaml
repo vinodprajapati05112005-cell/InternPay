@@ -13,11 +13,24 @@ services:
       - key: GEMINI_API_KEY
         sync: false
       - key: GEMINI_MODEL
-        value: gemini-2.5-flash
+        value: gemini-3.5-flash
       - key: DATABASE_URL
         fromDatabase:
           name: internpay-db
           property: connectionString
+
+      # Frontend build-time env vars used by the wallet and escrow flow.
+      # Set these in Render if the Vite build runs in this service.
+      # - key: VITE_API_BASE_URL
+      #   value: https://your-api.onrender.com
+      # - key: VITE_CHAIN_ID
+      #   value: 0x66eee
+      # - key: VITE_RPC_URL
+      #   value: https://...
+      # - key: VITE_EXPLORER_URL
+      #   value: https://...
+      # - key: VITE_ESCROW_CONTRACT_ADDRESS
+      #   value: 0x...
 
 databases:
   - name: internpay-db

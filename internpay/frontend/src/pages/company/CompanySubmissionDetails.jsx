@@ -23,8 +23,9 @@ import {
   BookOpen,
   Loader2,
 } from 'lucide-react';
-import { disputeApi, submissionApi } from '../../services/api';
+import { disputeApi, milestoneApi, submissionApi } from '../../services/api';
 import { formatDate, formatDateTime, humanizeEnum } from '../../utils/formatters';
+import { getEscrowExplorerTxUrl, hasEscrowContractConfig, releaseMilestoneOnChain } from '../../utils/blockchain';
 
 const getScoreColor = (score) => {
   if (score >= 85) return 'text-emerald-600';
@@ -79,6 +80,10 @@ const CompanySubmissionDetails = () => {
   const [disputeSubmitting, setDisputeSubmitting] = useState(false);
   const [disputeError, setDisputeError] = useState('');
   const [disputeSuccess, setDisputeSuccess] = useState(false);
+  const [isReleasing, setIsReleasing] = useState(false);
+  const [releaseError, setReleaseError] = useState('');
+  const [releaseSuccess, setReleaseSuccess] = useState('');
+  const [releaseTxHash, setReleaseTxHash] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -206,6 +211,63 @@ const CompanySubmissionDetails = () => {
   const linkEntries = submission.links || {};
   const hasEvaluation = Boolean(evaluation);
   const scoreClass = hasEvaluation ? getScoreColor(score) : 'text-slate-500';
+  const escrowId = submission?.contract_metadata?.escrow_id || submission?.contract_metadata?.escrowId || '';
+  const milestoneOrder = Number(submission?.milestone_order || 0);
+  const hasMilestoneOrder = Number.isFinite(milestoneOrder) && milestoneOrder > 0;
+  const hasOnChainEscrow = Boolean(escrowId && hasMilestoneOrder && hasEscrowContractConfig());
+  const releaseTxUrl = getEscrowExplorerTxUrl(releaseTxHash);
+
+  const handleReleasePayment = async () => {
+    if (!submission || isReleasing) {
+      return;
+    }
+
+    if (!escrowId) {
+      setReleaseError('This submission does not have an escrow id yet.');
+      return;
+    }
+
+    if (!hasMilestoneOrder) {
+      setReleaseError('Unable to resolve the milestone order for this submission.');
+      return;
+    }
+
+    if (!hasEscrowContractConfig()) {
+      setReleaseError('Set VITE_ESCROW_CONTRACT_ADDRESS to release funds on-chain.');
+      return;
+    }
+
+    setIsReleasing(true);
+    setReleaseError('');
+    setReleaseSuccess('');
+    setReleaseTxHash('');
+
+    try {
+      const onChainRelease = await releaseMilestoneOnChain({
+        escrowId,
+        milestoneId: milestoneOrder,
+      });
+
+      setReleaseTxHash(onChainRelease.txHash);
+
+      const releaseResult = await milestoneApi.release(submission.milestone, {
+        transaction_hash: onChainRelease.txHash,
+        reference: `Escrow #${escrowId} milestone #${milestoneOrder}`,
+      });
+
+      setSubmission((current) => ({
+        ...(current || {}),
+        contract_status: releaseResult?.contract?.status || current?.contract_status,
+        contract_metadata: releaseResult?.contract?.metadata || current?.contract_metadata,
+        milestone_status: releaseResult?.milestone?.status || current?.milestone_status,
+      }));
+      setReleaseSuccess('Funds released successfully to the student wallet.');
+    } catch (releaseError) {
+      setReleaseError(releaseError?.message || 'Unable to release funds.');
+    } finally {
+      setIsReleasing(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 p-4 sm:p-6 lg:p-8">
@@ -391,6 +453,16 @@ const CompanySubmissionDetails = () => {
               <CheckCircle2 className="w-5 h-5 text-blue-600" /> Quick Summary
             </h2>
             <div className="space-y-3">
+              {releaseError && (
+                <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+                  {releaseError}
+                </div>
+              )}
+              {releaseSuccess && (
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+                  {releaseSuccess}
+                </div>
+              )}
               <div className="flex justify-between items-center text-sm">
                 <span className="text-slate-500">AI Score</span>
                 <span className={`font-extrabold ${scoreClass}`}>
@@ -411,6 +483,36 @@ const CompanySubmissionDetails = () => {
                 <span className="text-slate-500">Proof Links</span>
                 <span className="font-semibold text-slate-700">{Object.keys(linkEntries).length}</span>
               </div>
+              {releaseTxHash && releaseTxUrl && (
+                <a
+                  href={releaseTxUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 text-xs font-semibold text-blue-700 hover:text-blue-900"
+                >
+                  View release transaction
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              )}
+              <button
+                type="button"
+                onClick={() => void handleReleasePayment()}
+                disabled={isReleasing || !hasEvaluation || !hasOnChainEscrow}
+                className="mt-2 w-full inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-4 py-3 text-sm font-semibold text-white shadow-lg transition-all hover:from-emerald-700 hover:to-teal-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isReleasing ? <Loader2 className="w-4 h-4 animate-spin" /> : <ThumbsUp className="w-4 h-4" />}
+                Approve & Release Funds
+              </button>
+              {!hasOnChainEscrow && (
+                <p className="text-xs text-amber-600">
+                  Set <code className="font-mono">VITE_ESCROW_CONTRACT_ADDRESS</code> and create an escrow id to enable on-chain release.
+                </p>
+              )}
+              {!hasEvaluation && (
+                <p className="text-xs text-slate-500">
+                  Wait for the AI evaluation before releasing funds.
+                </p>
+              )}
             </div>
           </motion.div>
         </div>

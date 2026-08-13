@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { contractApi, submissionApi } from '../../services/api';
 import { formatCurrency, formatDate, humanizeEnum } from '../../utils/formatters';
+import { hasEscrowContractConfig, submitMilestoneOnChain } from '../../utils/blockchain';
 
 const SubmitWork = () => {
   const { id } = useParams();
@@ -65,6 +66,8 @@ const SubmitWork = () => {
   const selectedMilestone = useMemo(() => {
     return contract?.milestones?.find((milestone) => milestone.id === selectedMilestoneId) || null;
   }, [contract, selectedMilestoneId]);
+  const escrowId = contract?.metadata?.escrow_id || contract?.metadata?.escrowId || '';
+  const hasOnChainEscrow = Boolean(escrowId && hasEscrowContractConfig());
 
   const handleChange = (field, value) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -96,6 +99,30 @@ const SubmitWork = () => {
     setIsSubmitting(true);
 
     try {
+      let transactionHash = '';
+
+      if (hasOnChainEscrow) {
+        if (!selectedMilestone?.order) {
+          throw new Error('Unable to resolve the milestone order for the blockchain submission.');
+        }
+
+        const onChainSubmission = await submitMilestoneOnChain({
+          escrowId,
+          milestoneId: Number(selectedMilestone.order),
+          evidence: {
+            contract_id: id,
+            milestone_order: selectedMilestone.order,
+            github_url: formData.github_url.trim(),
+            figma_url: formData.figma_url.trim(),
+            demo_url: formData.demo_url.trim(),
+            documentation_url: formData.documentation_url.trim(),
+            video_url: formData.video_url.trim(),
+            additional_notes: formData.additional_notes.trim(),
+          },
+        });
+        transactionHash = onChainSubmission.txHash;
+      }
+
       const submission = await submissionApi.create({
         contract_id: id,
         milestone_id: selectedMilestoneId,
@@ -105,6 +132,7 @@ const SubmitWork = () => {
         documentation_url: formData.documentation_url.trim(),
         video_url: formData.video_url.trim(),
         additional_notes: formData.additional_notes.trim(),
+        transaction_hash: transactionHash,
       });
 
       setSuccessMessage('Work submitted successfully. Redirecting to your submission details...');
@@ -409,6 +437,19 @@ const SubmitWork = () => {
                 <p className="font-semibold text-slate-900 mt-1">{formatDate(contract.deadline)}</p>
               </div>
             </div>
+            {escrowId && (
+              <div
+                className={`mt-4 rounded-xl border px-3 py-2 text-xs ${
+                  hasOnChainEscrow
+                    ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                    : 'border-amber-200 bg-amber-50 text-amber-700'
+                }`}
+              >
+                {hasOnChainEscrow
+                  ? `Escrow ${escrowId} is connected. Your submission will also be recorded on-chain.`
+                  : `Escrow ${escrowId} exists, but the blockchain config is missing on this deployment.`}
+              </div>
+            )}
           </div>
 
           {selectedMilestone && (

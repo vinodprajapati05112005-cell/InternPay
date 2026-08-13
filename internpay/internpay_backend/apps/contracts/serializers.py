@@ -139,6 +139,7 @@ class ContractDetailSerializer(BaseModelSerializer):
             "company_name": company.company_name,
             "company_website": company.company_website,
             "company_industry": company.company_industry,
+            "wallet_address": company.user.wallet_address,
         }
 
     def get_company_name(self, obj):
@@ -152,6 +153,7 @@ class ContractDetailSerializer(BaseModelSerializer):
             "id": str(student.id),
             "institution_name": student.institution_name,
             "course_name": student.course_name,
+            "wallet_address": student.user.wallet_address,
         }
 
     def get_student_name(self, obj):
@@ -169,6 +171,7 @@ class ContractDetailSerializer(BaseModelSerializer):
             "id": str(judge.id),
             "judge_display_name": judge.judge_display_name,
             "specialization": judge.specialization,
+            "wallet_address": judge.user.wallet_address,
         }
 
     def get_judge_name(self, obj):

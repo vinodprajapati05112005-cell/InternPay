@@ -18,7 +18,7 @@ from apps.submissions.models import AIReport
 logger = logging.getLogger(__name__)
 
 GEMINI_API_URL = os.getenv("GEMINI_API_URL", "https://generativelanguage.googleapis.com/v1beta").rstrip("/")
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash").strip() or "gemini-2.5-flash"
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.5-flash").strip() or "gemini-3.5-flash"
 
 _JSON_FENCE_RE = re.compile(r"^```(?:json)?\s*|\s*```$", re.IGNORECASE | re.MULTILINE)
 
@@ -266,14 +266,18 @@ def _parse_json_response(text: str) -> dict:
     if cleaned.startswith("```"):
         cleaned = _JSON_FENCE_RE.sub("", cleaned).strip()
 
+    decoder = json.JSONDecoder()
     try:
-        data = json.loads(cleaned)
+        data, _ = decoder.raw_decode(cleaned)
     except json.JSONDecodeError:
         start = cleaned.find("{")
-        end = cleaned.rfind("}")
-        if start == -1 or end == -1 or end <= start:
-            raise
-        data = json.loads(cleaned[start : end + 1])
+        if start == -1:
+            raise ValidationError("Gemini response must be a JSON object.")
+
+        try:
+            data, _ = decoder.raw_decode(cleaned[start:])
+        except json.JSONDecodeError as exc:
+            raise ValidationError("Gemini response must be valid JSON.") from exc
 
     if not isinstance(data, dict):
         raise ValidationError("Gemini response must be a JSON object.")
@@ -325,7 +329,7 @@ def _call_gemini(prompt: str) -> dict:
                     ],
                     "generationConfig": {
                         "temperature": 0.2,
-                        "response_mime_type": "application/json",
+                        "responseMimeType": "application/json",
                     },
                 },
                 timeout=30,
