@@ -39,6 +39,8 @@ const DISPUTE_DECISION_VALUES = {
   PARTIAL_PAYMENT: 3,
 };
 
+export const DEFAULT_DISPUTE_BOND_ETH = '0.00001';
+
 export const getEscrowContractAddress = () => (import.meta.env.VITE_ESCROW_CONTRACT_ADDRESS || '').trim();
 
 export const hasEscrowContractConfig = () => Boolean(getEscrowContractAddress());
@@ -237,7 +239,7 @@ export const submitMilestoneOnChain = async ({
 export const depositDisputeBondOnChain = async ({
   escrowId,
   milestoneId,
-  amountEth,
+  amountEth = DEFAULT_DISPUTE_BOND_ETH,
 }) => {
   const contract = await getEscrowContract();
   const bondWei = toEscrowWei(amountEth);

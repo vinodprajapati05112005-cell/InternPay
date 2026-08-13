@@ -3,14 +3,14 @@ import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft, CheckCircle2, Clock, FileText, Link as LinkIcon, AlertCircle, BarChart3, ChevronRight, Loader2, Wallet, Lock, ExternalLink } from 'lucide-react';
 import { submissionApi } from '../../services/api';
 import { compactHash, formatDateTime, humanizeEnum } from '../../utils/formatters';
-import { depositDisputeBondOnChain, getEscrowExplorerTxUrl, hasEscrowContractConfig } from '../../utils/blockchain';
+import { DEFAULT_DISPUTE_BOND_ETH, depositDisputeBondOnChain, getEscrowExplorerTxUrl, hasEscrowContractConfig } from '../../utils/blockchain';
 
 const StudentSubmissionDetails = () => {
   const { id } = useParams();
   const [submission, setSubmission] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
-  const [bondAmount, setBondAmount] = useState('');
+  const [bondAmount, setBondAmount] = useState(DEFAULT_DISPUTE_BOND_ETH);
   const [bondError, setBondError] = useState('');
   const [bondSuccess, setBondSuccess] = useState('');
   const [bondTxHash, setBondTxHash] = useState('');
@@ -113,7 +113,7 @@ const StudentSubmissionDetails = () => {
       return;
     }
 
-    const amount = String(bondAmount || '').trim();
+    const amount = String(bondAmount || DEFAULT_DISPUTE_BOND_ETH).trim();
     if (!amount || Number(amount) <= 0) {
       setBondError('Enter a dispute bond amount greater than zero.');
       return;
@@ -306,9 +306,9 @@ const StudentSubmissionDetails = () => {
                   <Wallet className="w-5 h-5 text-amber-600" />
                   Student Dispute Bond
                 </h2>
-                <p className="text-sm text-slate-600 leading-relaxed mb-4">
-                  Add a student bond while the dispute is open. If you win, this bond is returned to your wallet. If you lose, the bond goes to the judge.
-                </p>
+                  <p className="text-sm text-slate-600 leading-relaxed mb-4">
+                    Add the default 0.00001 ETH student bond while the dispute is open. If you win, this bond is returned to your wallet. If you lose, the bond goes to the judge.
+                  </p>
 
                 {bondError && (
                   <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
@@ -340,14 +340,14 @@ const StudentSubmissionDetails = () => {
                   inputMode="decimal"
                   value={bondAmount}
                   onChange={(event) => setBondAmount(event.target.value)}
-                  placeholder="0.01"
+                  placeholder={DEFAULT_DISPUTE_BOND_ETH}
                   className="w-full px-4 py-2.5 mb-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                 />
 
                 <button
                   type="button"
                   onClick={() => void handleDepositBond()}
-                  disabled={isDepositingBond}
+                  disabled={isDepositingBond || Boolean(bondSuccess)}
                   className="w-full py-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-xl font-semibold text-sm hover:from-amber-600 hover:to-orange-600 shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                   {isDepositingBond ? <Loader2 className="w-4 h-4 animate-spin" /> : <Lock className="w-4 h-4" />}

@@ -20,12 +20,19 @@ import {
   Shield,
   Star,
   AlertCircle,
+  Wallet,
   BookOpen,
   Loader2,
 } from 'lucide-react';
 import { disputeApi, milestoneApi, submissionApi } from '../../services/api';
 import { formatDate, formatDateTime, humanizeEnum } from '../../utils/formatters';
-import { getEscrowExplorerTxUrl, hasEscrowContractConfig, releaseMilestoneOnChain } from '../../utils/blockchain';
+import {
+  DEFAULT_DISPUTE_BOND_ETH,
+  depositDisputeBondOnChain,
+  getEscrowExplorerTxUrl,
+  hasEscrowContractConfig,
+  releaseMilestoneOnChain,
+} from '../../utils/blockchain';
 
 const getScoreColor = (score) => {
   if (score >= 85) return 'text-emerald-600';
@@ -84,6 +91,11 @@ const CompanySubmissionDetails = () => {
   const [releaseError, setReleaseError] = useState('');
   const [releaseSuccess, setReleaseSuccess] = useState('');
   const [releaseTxHash, setReleaseTxHash] = useState('');
+  const [companyBondAmount, setCompanyBondAmount] = useState(DEFAULT_DISPUTE_BOND_ETH);
+  const [companyBondError, setCompanyBondError] = useState('');
+  const [companyBondSuccess, setCompanyBondSuccess] = useState('');
+  const [companyBondTxHash, setCompanyBondTxHash] = useState('');
+  const [isDepositingCompanyBond, setIsDepositingCompanyBond] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -175,11 +187,61 @@ const CompanySubmissionDetails = () => {
         description,
         evidence,
       });
+      setSubmission((current) => (current ? { ...current, status: 'DISPUTED', contract_status: 'DISPUTED' } : current));
+      setCompanyBondError('');
+      setCompanyBondSuccess('');
+      setCompanyBondTxHash('');
       setDisputeSuccess(true);
     } catch (submitError) {
       setDisputeError(submitError?.message || 'Unable to file the dispute.');
     } finally {
       setDisputeSubmitting(false);
+    }
+  };
+
+  const handleDepositCompanyBond = async () => {
+    if (!submission || isDepositingCompanyBond) {
+      return;
+    }
+
+    const amount = String(companyBondAmount || DEFAULT_DISPUTE_BOND_ETH).trim();
+    if (!amount || Number(amount) <= 0) {
+      setCompanyBondError('Enter a dispute bond amount greater than zero.');
+      return;
+    }
+
+    if (!escrowId) {
+      setCompanyBondError('This submission does not have an escrow id yet.');
+      return;
+    }
+
+    if (!hasMilestoneOrder) {
+      setCompanyBondError('Unable to resolve the milestone order for this submission.');
+      return;
+    }
+
+    if (!hasOnChainEscrow) {
+      setCompanyBondError('Set VITE_ESCROW_CONTRACT_ADDRESS to deposit the company bond on-chain.');
+      return;
+    }
+
+    setIsDepositingCompanyBond(true);
+    setCompanyBondError('');
+    setCompanyBondSuccess('');
+
+    try {
+      const result = await depositDisputeBondOnChain({
+        escrowId,
+        milestoneId: milestoneOrder,
+        amountEth: amount,
+      });
+
+      setCompanyBondTxHash(result.txHash);
+      setCompanyBondSuccess(`Company bond locked on-chain for ${amount} ETH.`);
+    } catch (depositError) {
+      setCompanyBondError(depositError?.message || 'Unable to lock the company dispute bond.');
+    } finally {
+      setIsDepositingCompanyBond(false);
     }
   };
 
@@ -294,7 +356,7 @@ const CompanySubmissionDetails = () => {
               onClick={() => setShowDisputeModal(true)}
               className="inline-flex items-center gap-2 px-5 py-2.5 bg-white border border-rose-200 text-rose-700 rounded-xl font-semibold text-sm hover:bg-rose-50 transition-colors"
             >
-              <AlertTriangle className="w-4 h-4" /> File Dispute
+              <AlertTriangle className="w-4 h-4" /> {isDisputed ? 'View Dispute' : 'File Dispute'}
             </button>
           </div>
         </div>
@@ -533,7 +595,7 @@ const CompanySubmissionDetails = () => {
         {showDisputeModal && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
             <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }} className="bg-white rounded-2xl p-6 max-w-lg w-full shadow-2xl max-h-[90vh] overflow-y-auto">
-              {!disputeSuccess ? (
+              {!disputeSuccess && !isDisputed ? (
                 <>
                   <div className="flex items-center justify-between mb-5">
                     <h3 className="text-xl font-extrabold text-slate-900 flex items-center gap-2">
@@ -610,7 +672,62 @@ const CompanySubmissionDetails = () => {
                     <CheckCircle2 className="w-8 h-8 text-emerald-600" />
                   </div>
                   <h3 className="text-2xl font-extrabold text-slate-900 mb-2">Dispute Filed</h3>
-                  <p className="text-slate-500 mb-6">The dispute has been submitted and will be reviewed by a judge.</p>
+                  <p className="text-slate-500 mb-4">The dispute has been submitted and will be reviewed by a judge.</p>
+
+                  <div className="mb-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-left">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Wallet className="w-4 h-4 text-amber-600" />
+                      <h4 className="text-sm font-semibold text-slate-900">Company Dispute Bond</h4>
+                    </div>
+                    <p className="text-xs text-slate-600 mb-3">
+                      Lock the default 0.00001 ETH company bond here if you have not already done so. The student uses the same bond amount, and the judge settles both bonds when the dispute is resolved.
+                    </p>
+
+                    {companyBondError && (
+                      <div className="mb-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+                        {companyBondError}
+                      </div>
+                    )}
+
+                    {companyBondSuccess && (
+                      <div className="mb-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+                        <div>{companyBondSuccess}</div>
+                        {companyBondTxHash && getEscrowExplorerTxUrl(companyBondTxHash) && (
+                          <a
+                            href={getEscrowExplorerTxUrl(companyBondTxHash)}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="mt-1 inline-flex items-center gap-1 font-semibold text-emerald-700 hover:text-emerald-900"
+                          >
+                            View bond transaction
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                        )}
+                      </div>
+                    )}
+
+                    <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Bond Amount (ETH)</label>
+                    <input
+                      type="number"
+                      step="0.000001"
+                      inputMode="decimal"
+                      value={companyBondAmount}
+                      onChange={(event) => setCompanyBondAmount(event.target.value)}
+                      placeholder={DEFAULT_DISPUTE_BOND_ETH}
+                      className="w-full px-4 py-2.5 mb-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                    />
+
+                    <button
+                      type="button"
+                      onClick={() => void handleDepositCompanyBond()}
+                      disabled={isDepositingCompanyBond || Boolean(companyBondSuccess)}
+                      className="w-full py-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-xl font-semibold text-sm hover:from-amber-600 hover:to-orange-600 shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                      {isDepositingCompanyBond ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wallet className="w-4 h-4" />}
+                      Lock Company Bond
+                    </button>
+                  </div>
+
                   <Link to="/company/disputes" className="block w-full py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl font-semibold text-sm hover:from-blue-700 hover:to-indigo-700 shadow-lg transition-all">
                     View Disputes
                   </Link>

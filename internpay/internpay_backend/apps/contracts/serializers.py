@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from decimal import Decimal
+from datetime import timedelta
 
 from django.utils import timezone
 from rest_framework import serializers
@@ -31,7 +32,7 @@ class ContractMilestoneInputSerializer(serializers.Serializer):
 class ContractWriteSerializer(BaseModelSerializer):
     milestones = ContractMilestoneInputSerializer(many=True, required=False)
     student_id = serializers.CharField(required=False, allow_null=True, allow_blank=True)
-    judge_id = serializers.UUIDField(required=False, allow_null=True)
+    judge_id = serializers.CharField(required=False, allow_null=True, allow_blank=True)
 
     class Meta:
         model = Contract
@@ -62,6 +63,17 @@ class ContractWriteSerializer(BaseModelSerializer):
         return value
 
     def validate(self, attrs):
+        if not self.partial:
+            for field, label in (
+                ("student_id", "Student"),
+                ("judge_id", "Judge"),
+            ):
+                value = attrs.get(field)
+                if not value or not str(value).strip():
+                    raise serializers.ValidationError(
+                        {field: f"{label} wallet, email, or profile ID is required."}
+                    )
+
         milestones = attrs.get("milestones") or []
         total_amount = attrs.get("total_amount")
         if milestones and total_amount is not None:
@@ -184,12 +196,13 @@ class ContractDetailSerializer(BaseModelSerializer):
         qs = obj.milestones.all().order_by("order")
         if not qs.exists():
             from apps.milestones.models import Milestone
+            deadline = obj.deadline or (timezone.now() + timedelta(days=7))
             Milestone.objects.create(
                 contract=obj,
                 title=obj.title,
                 description=obj.description or f"Deliverables for {obj.title}",
                 amount=obj.total_amount,
-                deadline=obj.deadline,
+                deadline=deadline,
                 order=1,
             )
             qs = obj.milestones.all().order_by("order")

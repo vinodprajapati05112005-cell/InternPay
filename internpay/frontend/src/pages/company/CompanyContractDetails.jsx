@@ -78,7 +78,7 @@ const CompanyContractDetails = () => {
   const handleAssignStudent = async (e) => {
     e.preventDefault();
     if (!studentInput.trim()) {
-      setAssignError('Please enter a student email, profile ID, or wallet address.');
+      setAssignError('Please enter a student wallet address, email, or profile ID.');
       return;
     }
     setIsAssigning(true);
@@ -413,7 +413,7 @@ const CompanyContractDetails = () => {
             </div>
 
             <p className="text-sm text-slate-500">
-              Enter the student's email address, profile ID, or wallet address. This will convert the draft contract into a Pending proposal and send it to the student.
+              Enter the student's wallet address, email, or profile ID. This will convert the draft contract into a Pending proposal and send it to the student.
             </p>
 
             {assignError && (
@@ -425,7 +425,7 @@ const CompanyContractDetails = () => {
             <form onSubmit={handleAssignStudent} className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Student Email / Profile ID / Wallet
+                  Student Wallet / Email / Profile ID
                 </label>
                 <input
                   type="text"

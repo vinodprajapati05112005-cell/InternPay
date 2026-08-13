@@ -107,8 +107,12 @@ const CreateContract = () => {
   };
 
   const handleSubmit = async () => {
-    if (!termsAccepted) {
-      setErrors({ terms: 'You must accept the terms' });
+    const nextErrors = {};
+    if (!projectData.student_id.trim()) nextErrors.student_id = 'Student wallet, email, or profile ID is required';
+    if (!projectData.judge_id.trim()) nextErrors.judge_id = 'Judge wallet, email, or profile ID is required';
+    if (!termsAccepted) nextErrors.terms = 'You must accept the terms';
+    if (Object.keys(nextErrors).length) {
+      setErrors(nextErrors);
       return;
     }
 
@@ -293,24 +297,26 @@ const CreateContract = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Student UUID (optional)</label>
+                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Student Wallet / Email / Profile ID</label>
                 <input
                   type="text"
                   value={projectData.student_id}
                   onChange={(event) => setProjectData({ ...projectData, student_id: event.target.value })}
-                  placeholder="Student UUID"
+                  placeholder="Student wallet address, email, or profile ID"
                   className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono"
                 />
+                {errors.student_id && <p className="text-red-500 text-xs mt-1">{errors.student_id}</p>}
               </div>
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Judge UUID (optional)</label>
+                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Judge Wallet / Email / Profile ID</label>
                 <input
                   type="text"
                   value={projectData.judge_id}
                   onChange={(event) => setProjectData({ ...projectData, judge_id: event.target.value })}
-                  placeholder="Judge UUID"
+                  placeholder="Judge wallet address, email, or profile ID"
                   className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono"
                 />
+                {errors.judge_id && <p className="text-red-500 text-xs mt-1">{errors.judge_id}</p>}
               </div>
             </div>
 
@@ -423,8 +429,8 @@ const CreateContract = () => {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
                     <p><span className="text-slate-500">Title:</span> <span className="font-medium text-slate-900">{projectData.title || '—'}</span></p>
                     <p><span className="text-slate-500">Deadline:</span> <span className="font-medium text-slate-900">{projectData.deadline ? formatDate(projectData.deadline) : '—'}</span></p>
-                    <p className="sm:col-span-2"><span className="text-slate-500">Student UUID:</span> <span className="font-mono font-medium text-slate-900">{projectData.student_id || '—'}</span></p>
-                    <p className="sm:col-span-2"><span className="text-slate-500">Judge UUID:</span> <span className="font-mono font-medium text-slate-900">{projectData.judge_id || '—'}</span></p>
+                    <p className="sm:col-span-2"><span className="text-slate-500">Student:</span> <span className="font-mono font-medium text-slate-900">{projectData.student_id || '-'}</span></p>
+                    <p className="sm:col-span-2"><span className="text-slate-500">Judge:</span> <span className="font-mono font-medium text-slate-900">{projectData.judge_id || '-'}</span></p>
                     <p className="sm:col-span-2"><span className="text-slate-500">Description:</span> <span className="font-medium text-slate-900">{projectData.description || '—'}</span></p>
                   </div>
                 </div>

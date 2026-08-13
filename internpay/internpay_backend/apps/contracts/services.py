@@ -70,6 +70,58 @@ def resolve_student(student_identity: str | None):
     return None
 
 
+def resolve_judge(judge_identity: str | None):
+    from apps.judges.models import Judge
+    from django.db.models import Q
+
+    if not judge_identity or not str(judge_identity).strip():
+        return None
+
+    import uuid
+
+    def is_valid_uuid(val):
+        try:
+            uuid.UUID(str(val))
+            return True
+        except ValueError:
+            return False
+
+    judge_identity_str = str(judge_identity).strip()
+
+    # 1. Try resolving by Judge profile ID (UUID)
+    if is_valid_uuid(judge_identity_str):
+        judge = Judge.objects.filter(id=judge_identity_str).first()
+        if judge:
+            return judge
+
+    # 2. Try resolving by User ID (UUID)
+    if is_valid_uuid(judge_identity_str):
+        judge = Judge.objects.filter(user__id=judge_identity_str).first()
+        if judge:
+            return judge
+
+    # 3. Try resolving by exact email
+    judge = Judge.objects.filter(user__email__iexact=judge_identity_str).first()
+    if judge:
+        return judge
+
+    # 4. Try resolving by wallet address
+    judge = Judge.objects.filter(user__wallet_address__iexact=judge_identity_str).first()
+    if judge:
+        return judge
+
+    # 5. Try resolving by judge display name or user name
+    judge = Judge.objects.filter(
+        Q(judge_display_name__icontains=judge_identity_str) |
+        Q(user__first_name__icontains=judge_identity_str) |
+        Q(user__last_name__icontains=judge_identity_str)
+    ).first()
+    if judge:
+        return judge
+
+    return None
+
+
 def _ensure_editable(contract: Contract, action: str) -> None:
     if contract.status not in {
         ContractStatus.DRAFT,
@@ -87,18 +139,18 @@ def create_contract(*, company, validated_data: dict) -> Contract:
     judge_id = validated_data.pop("judge_id", None)
 
     student = resolve_student(student_id)
+    if not student_id or not student:
+        raise ValidationError({"student_id": "Student wallet, email, or profile ID is required and must resolve to a student."})
 
-    judge = None
-    if judge_id:
-        from apps.judges.models import Judge
-
-        judge = Judge.objects.filter(id=judge_id).first()
+    judge = resolve_judge(judge_id)
+    if not judge_id or not judge:
+        raise ValidationError({"judge_id": "Judge wallet, email, or profile ID is required and must resolve to a judge."})
 
     contract = Contract.objects.create(
         company=company,
         student=student,
         judge=judge,
-        status=ContractStatus.PENDING if student else ContractStatus.DRAFT,
+        status=ContractStatus.PENDING,
         funded_amount=Decimal("0.00"),
         **validated_data,
     )
@@ -144,7 +196,13 @@ def update_contract(contract: Contract, validated_data: dict) -> Contract:
             setattr(contract, field, validated_data[field])
     if "student_id" in validated_data:
         student_id = validated_data.pop("student_id")
-        contract.student = resolve_student(student_id)
+        if student_id:
+            student = resolve_student(student_id)
+            if not student:
+                raise ValidationError({"student_id": "Student could not be resolved by UUID, email, or wallet address."})
+            contract.student = student
+        else:
+            contract.student = None
         if contract.student and contract.status in {
             ContractStatus.DRAFT,
             ContractStatus.REJECTED,
@@ -152,9 +210,14 @@ def update_contract(contract: Contract, validated_data: dict) -> Contract:
         }:
             contract.status = ContractStatus.PENDING
     if validated_data.get("judge_id") is not None:
-        from apps.judges.models import Judge
-
-        contract.judge = Judge.objects.filter(id=validated_data["judge_id"]).first()
+        judge_id = validated_data["judge_id"]
+        if judge_id:
+          judge = resolve_judge(judge_id)
+          if not judge:
+              raise ValidationError({"judge_id": "Judge could not be resolved by UUID, email, or wallet address."})
+          contract.judge = judge
+        else:
+            contract.judge = None
     contract.save()
     return contract
 
