@@ -1,5 +1,5 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
-const REQUEST_TIMEOUT_MS = 10_000;
+const REQUEST_TIMEOUT_MS = 120_000;
 const AUTH_STORAGE_KEY = 'internpay_auth';
 export const AUTH_SESSION_EVENT = 'internpay:auth-session-changed';
 
@@ -224,7 +224,7 @@ export const request = async (
     });
   } catch (err) {
     if (err?.name === 'AbortError') {
-      throw new ApiError('Request timed out. The server may be starting up — please try again in a moment.', { status: 0 });
+      throw new ApiError('Request timed out. The server may be starting up or still warming up on Render. Please try again in a moment.', { status: 0 });
     }
     throw err;
   } finally {

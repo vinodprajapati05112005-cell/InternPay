@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from rest_framework import serializers
 
+from apps.common.amounts import AMOUNT_DECIMAL_PLACES, AMOUNT_MAX_DIGITS
 from apps.common.choices import DisputeDecision, DisputeReason
 from apps.common.serializers import BaseModelSerializer
 from apps.common.validators import validate_file_upload
@@ -52,6 +53,7 @@ class DisputeResolveSerializer(serializers.Serializer):
     split_percentage = serializers.IntegerField(required=False, allow_null=True, min_value=1, max_value=99)
     reasoning = serializers.CharField()
     scores = serializers.DictField(child=serializers.IntegerField(), required=False)
+    judge_reward = serializers.DecimalField(max_digits=AMOUNT_MAX_DIGITS, decimal_places=AMOUNT_DECIMAL_PLACES, required=False, allow_null=True)
     transaction_hash = serializers.CharField(required=False, allow_blank=True)
 
 

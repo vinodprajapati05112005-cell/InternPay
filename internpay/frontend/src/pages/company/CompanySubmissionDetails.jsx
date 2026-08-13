@@ -215,6 +215,7 @@ const CompanySubmissionDetails = () => {
   const milestoneOrder = Number(submission?.milestone_order || 0);
   const hasMilestoneOrder = Number.isFinite(milestoneOrder) && milestoneOrder > 0;
   const hasOnChainEscrow = Boolean(escrowId && hasMilestoneOrder && hasEscrowContractConfig());
+  const isDisputed = String(submission?.status || submission?.contract_status || '').toUpperCase() === 'DISPUTED';
   const releaseTxUrl = getEscrowExplorerTxUrl(releaseTxHash);
 
   const handleReleasePayment = async () => {
@@ -234,6 +235,11 @@ const CompanySubmissionDetails = () => {
 
     if (!hasEscrowContractConfig()) {
       setReleaseError('Set VITE_ESCROW_CONTRACT_ADDRESS to release funds on-chain.');
+      return;
+    }
+
+    if (isDisputed) {
+      setReleaseError('This submission is under dispute. Resolve the dispute before releasing funds.');
       return;
     }
 
@@ -497,12 +503,17 @@ const CompanySubmissionDetails = () => {
               <button
                 type="button"
                 onClick={() => void handleReleasePayment()}
-                disabled={isReleasing || !hasEvaluation || !hasOnChainEscrow}
+                disabled={isReleasing || !hasEvaluation || !hasOnChainEscrow || isDisputed}
                 className="mt-2 w-full inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-4 py-3 text-sm font-semibold text-white shadow-lg transition-all hover:from-emerald-700 hover:to-teal-700 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {isReleasing ? <Loader2 className="w-4 h-4 animate-spin" /> : <ThumbsUp className="w-4 h-4" />}
                 Approve & Release Funds
               </button>
+              {isDisputed && (
+                <p className="text-xs text-rose-600">
+                  This submission is disputed. The judge must resolve the case before funds can be released.
+                </p>
+              )}
               {!hasOnChainEscrow && (
                 <p className="text-xs text-amber-600">
                   Set <code className="font-mono">VITE_ESCROW_CONTRACT_ADDRESS</code> and create an escrow id to enable on-chain release.

@@ -347,6 +347,9 @@ impl storage::InternPayEscrow {
         let mut dispute = disputes_map.setter(milestone_id);
         dispute.filed_by.set(sender);
         dispute.evidence_hash.set(evidence_hash);
+        dispute.company_bond.set(U256::ZERO);
+        dispute.intern_bond.set(U256::ZERO);
+        dispute.judge_reward.set(U256::ZERO);
         dispute.resolved_at.set(U64::ZERO);
         dispute.status.set(U8::from(1));
         dispute.decision.set(U8::from(types::DisputeDecision::None as u8));
@@ -358,6 +361,65 @@ impl storage::InternPayEscrow {
             milestoneId: milestone_id,
             filedBy: sender,
             evidenceHash: evidence_hash,
+        });
+
+        Ok(())
+    }
+
+    #[payable]
+    pub fn deposit_dispute_bond(
+        &mut self,
+        escrow_id: u64,
+        milestone_id: u32,
+    ) -> Result<(), Vec<u8>> {
+        let sender = self.vm().msg_sender();
+        let value = self.vm().msg_value();
+
+        if value.is_zero() {
+            return Err(InternPayError::InvalidAmount.into());
+        }
+
+        let escrow = self.escrows.getter(escrow_id);
+        if escrow.status.get().to::<u8>() != types::EscrowStatus::Disputed as u8 {
+            return Err(InternPayError::InvalidState.into());
+        }
+
+        let company = escrow.company.get();
+        let intern = escrow.intern.get();
+        if sender != company && sender != intern {
+            return Err(InternPayError::Unauthorized.into());
+        }
+        drop(escrow);
+
+        let milestones_map = self.milestones.getter(escrow_id);
+        let milestone = milestones_map.getter(milestone_id);
+        if milestone.status.get().to::<u8>() != types::MilestoneStatus::Disputed as u8 {
+            return Err(InternPayError::InvalidState.into());
+        }
+        drop(milestone);
+        drop(milestones_map);
+
+        let mut disputes_map = self.disputes.setter(escrow_id);
+        let mut dispute = disputes_map.setter(milestone_id);
+        if dispute.status.get().to::<u8>() != 1 {
+            return Err(InternPayError::InvalidState.into());
+        }
+
+        if sender == company {
+            let current = dispute.company_bond.get();
+            dispute.company_bond.set(current + value);
+        } else {
+            let current = dispute.intern_bond.get();
+            dispute.intern_bond.set(current + value);
+        }
+        drop(dispute);
+        drop(disputes_map);
+
+        self.vm().log(events::DisputeBondDeposited {
+            escrowId: escrow_id,
+            milestoneId: milestone_id,
+            sender,
+            amount: value,
         });
 
         Ok(())
@@ -386,7 +448,6 @@ impl storage::InternPayEscrow {
         let intern = escrow.intern.get();
         let company = escrow.company.get();
         let old_released = escrow.released_amount.get();
-        let old_funded = escrow.funded_amount.get();
         drop(escrow);
 
         let milestones_map = self.milestones.getter(escrow_id);
@@ -402,11 +463,41 @@ impl storage::InternPayEscrow {
         drop(milestone);
         drop(milestones_map);
 
+        let disputes_map = self.disputes.getter(escrow_id);
+        let dispute = disputes_map.getter(milestone_id);
+        if dispute.status.get().to::<u8>() != 1 {
+            return Err(InternPayError::InvalidState.into());
+        }
+        let company_bond = dispute.company_bond.get();
+        let intern_bond = dispute.intern_bond.get();
+        drop(dispute);
+        drop(disputes_map);
+
         if decision != types::DisputeDecision::Release as u8
             && decision != types::DisputeDecision::Refund as u8
             && decision != types::DisputeDecision::Split as u8
         {
             return Err(InternPayError::InvalidState.into());
+        }
+
+        let mut judge_reward = U256::ZERO;
+        let mut company_bond_return = U256::ZERO;
+        let mut intern_bond_return = U256::ZERO;
+
+        if decision == types::DisputeDecision::Release as u8 {
+            intern_bond_return = intern_bond;
+            judge_reward = company_bond;
+        } else if decision == types::DisputeDecision::Refund as u8 {
+            company_bond_return = company_bond;
+            judge_reward = intern_bond;
+        } else {
+            if milestone_amount.is_zero() {
+                return Err(InternPayError::InvalidAmount.into());
+            }
+
+            intern_bond_return = intern_bond * released_to_intern / milestone_amount;
+            company_bond_return = company_bond * refunded_to_company / milestone_amount;
+            judge_reward = (intern_bond - intern_bond_return) + (company_bond - company_bond_return);
         }
 
         if released_to_intern > U256::ZERO {
@@ -417,11 +508,26 @@ impl storage::InternPayEscrow {
             transfer_eth(self.vm(), company, refunded_to_company).map_err(|_| InternPayError::TransferFailed)?;
         }
 
+        if intern_bond_return > U256::ZERO {
+            transfer_eth(self.vm(), intern, intern_bond_return).map_err(|_| InternPayError::TransferFailed)?;
+        }
+
+        if company_bond_return > U256::ZERO {
+            transfer_eth(self.vm(), company, company_bond_return).map_err(|_| InternPayError::TransferFailed)?;
+        }
+
+        if judge_reward > U256::ZERO {
+            transfer_eth(self.vm(), judge, judge_reward).map_err(|_| InternPayError::TransferFailed)?;
+        }
+
         let mut disputes_map = self.disputes.setter(escrow_id);
         let mut dispute = disputes_map.setter(milestone_id);
         dispute.resolved_at.set(U64::from(now));
         dispute.decision.set(U8::from(decision));
         dispute.status.set(U8::from(2));
+        dispute.judge_reward.set(judge_reward);
+        dispute.company_bond.set(U256::ZERO);
+        dispute.intern_bond.set(U256::ZERO);
         drop(dispute);
         drop(disputes_map);
 
@@ -439,12 +545,10 @@ impl storage::InternPayEscrow {
         drop(milestones_map);
 
         let mut escrow = self.escrows.setter(escrow_id);
-        let new_released = old_released + released_to_intern;
+        let new_released = old_released + released_to_intern + refunded_to_company;
         escrow.released_amount.set(new_released);
-        let funded = old_funded - refunded_to_company;
-        escrow.funded_amount.set(funded);
-        let released = escrow.released_amount.get();
-        if released == funded {
+        let funded = escrow.funded_amount.get();
+        if new_released == funded {
             escrow.status.set(U8::from(types::EscrowStatus::Completed as u8));
         } else {
             escrow.status.set(U8::from(types::EscrowStatus::Funded as u8));
@@ -457,6 +561,7 @@ impl storage::InternPayEscrow {
             decision,
             releasedToIntern: released_to_intern,
             refundedToCompany: refunded_to_company,
+            judgeReward: judge_reward,
         });
 
         Ok(())

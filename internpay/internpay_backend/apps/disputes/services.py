@@ -130,6 +130,7 @@ def resolve_dispute(*, dispute: Dispute, judge, validated_data: dict, request=No
     reasoning = validated_data["reasoning"]
     split_percentage = validated_data.get("split_percentage")
     transaction_hash = validated_data.get("transaction_hash", "")
+    judge_reward = Decimal(str(validated_data.get("judge_reward") or 0)).quantize(AMOUNT_QUANTUM)
 
     contract_amount = Decimal(str(dispute.submission.milestone.amount))
     resolution_amount = Decimal("0.00")
@@ -176,6 +177,7 @@ def resolve_dispute(*, dispute: Dispute, judge, validated_data: dict, request=No
     dispute.resolved_at = timezone.now()
     dispute.transaction_hash = transaction_hash
     dispute.resolution_amount = resolution_amount
+    dispute.judge_reward = judge_reward
     dispute.save()
 
     milestone = dispute.submission.milestone

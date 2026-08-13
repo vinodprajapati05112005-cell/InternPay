@@ -3,6 +3,11 @@ import { AUTH_SESSION_EVENT, authApi, clearStoredAuth, getStoredAuth, normalizeA
 
 const AuthContext = createContext(null);
 
+const isTransientProfileError = (error) => {
+  const message = String(error?.message || '').toLowerCase();
+  return error?.status === 0 || error?.name === 'AbortError' || message.includes('timed out');
+};
+
 export const AuthProvider = ({ children }) => {
   const storedSession = getStoredAuth();
   const [user, setUser] = useState(storedSession?.user ?? null);
@@ -73,8 +78,12 @@ export const AuthProvider = ({ children }) => {
         ...stored,
         user: profile,
       });
-    } catch {
-      syncSession(null);
+    } catch (error) {
+      if (stored && isTransientProfileError(error)) {
+        syncSession(stored);
+      } else {
+        syncSession(null);
+      }
     } finally {
       setIsLoading(false);
     }

@@ -261,23 +261,53 @@ def _extract_candidate_text(body: dict) -> str:
     return text
 
 
-def _parse_json_response(text: str) -> dict:
+def _extract_json_fragment(text: str) -> str:
     cleaned = text.strip()
     if cleaned.startswith("```"):
         cleaned = _JSON_FENCE_RE.sub("", cleaned).strip()
 
-    decoder = json.JSONDecoder()
-    try:
-        data, _ = decoder.raw_decode(cleaned)
-    except json.JSONDecodeError:
-        start = cleaned.find("{")
-        if start == -1:
-            raise ValidationError("Gemini response must be a JSON object.")
+    start = None
+    for index, char in enumerate(cleaned):
+        if char == "{":
+            start = index
+            break
 
-        try:
-            data, _ = decoder.raw_decode(cleaned[start:])
-        except json.JSONDecodeError as exc:
-            raise ValidationError("Gemini response must be valid JSON.") from exc
+    if start is None:
+        raise ValidationError("Gemini response must be a JSON object.")
+
+    depth = 0
+    in_string = False
+    escape = False
+    for index in range(start, len(cleaned)):
+        char = cleaned[index]
+
+        if in_string:
+            if escape:
+                escape = False
+            elif char == "\\":
+                escape = True
+            elif char == '"':
+                in_string = False
+            continue
+
+        if char == '"':
+            in_string = True
+        elif char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth == 0:
+                return cleaned[start : index + 1]
+
+    raise ValidationError("Gemini response must be valid JSON.")
+
+
+def _parse_json_response(text: str) -> dict:
+    fragment = _extract_json_fragment(text)
+    try:
+        data = json.loads(fragment)
+    except json.JSONDecodeError as exc:
+        raise ValidationError("Gemini response must be valid JSON.") from exc
 
     if not isinstance(data, dict):
         raise ValidationError("Gemini response must be a JSON object.")

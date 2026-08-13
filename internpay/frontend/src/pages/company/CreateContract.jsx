@@ -33,6 +33,9 @@ const CreateContract = () => {
   const [isCreatingEscrow, setIsCreatingEscrow] = useState(false);
   const [escrowError, setEscrowError] = useState('');
   const [escrowResult, setEscrowResult] = useState(null);
+  const [escrowWalletPromptOpen, setEscrowWalletPromptOpen] = useState(false);
+  const [escrowStudentWallet, setEscrowStudentWallet] = useState('');
+  const [escrowJudgeWallet, setEscrowJudgeWallet] = useState('');
 
   const [projectData, setProjectData] = useState({
     title: '',
@@ -142,8 +145,23 @@ const CreateContract = () => {
     }
   };
 
-  const handleCreateEscrow = async () => {
+  const handleCreateEscrow = async (studentWalletOverride = '', judgeWalletOverride = '') => {
     if (!createdContract?.id) {
+      return;
+    }
+
+    const studentWallet = String(
+      studentWalletOverride || createdContract?.student?.wallet_address || createdContract?.student_wallet_address || '',
+    ).trim();
+    const judgeWallet = String(
+      judgeWalletOverride || createdContract?.judge?.wallet_address || createdContract?.judge_wallet_address || '',
+    ).trim();
+
+    if (!studentWallet || !judgeWallet) {
+      setEscrowError('');
+      setEscrowWalletPromptOpen(true);
+      setEscrowStudentWallet(studentWallet);
+      setEscrowJudgeWallet(judgeWallet);
       return;
     }
 
@@ -152,12 +170,6 @@ const CreateContract = () => {
     setEscrowResult(null);
 
     try {
-      const studentWallet = createdContract?.student?.wallet_address || createdContract?.student_wallet_address || '';
-      if (!studentWallet) {
-        throw new Error('A student wallet address is required before locking escrow on-chain.');
-      }
-
-      const judgeWallet = createdContract?.judge?.wallet_address || createdContract?.judge_wallet_address || '';
       const escrow = await createAndLockEscrow({
         internAddress: studentWallet,
         judgeAddress: judgeWallet,
@@ -173,6 +185,9 @@ const CreateContract = () => {
 
       setCreatedContract(updatedContract || createdContract);
       setEscrowResult(escrow);
+      setEscrowWalletPromptOpen(false);
+      setEscrowStudentWallet('');
+      setEscrowJudgeWallet('');
     } catch (escrowCreateError) {
       setEscrowError(escrowCreateError?.message || 'Unable to create the escrow contract on-chain.');
     } finally {
@@ -499,7 +514,7 @@ const CreateContract = () => {
                 <CheckCircle2 className="w-8 h-8 text-emerald-600" />
               </div>
               <h3 className="text-2xl font-extrabold text-slate-900 mb-2">Contract Created!</h3>
-              <p className="text-slate-500 mb-6">Your escrow contract has been created successfully. The popup below is where we lock the funds on-chain.</p>
+              <p className="text-slate-500 mb-6">Your escrow contract has been created successfully. The popup below will ask for the student and judge wallets before we lock the funds on-chain.</p>
 
               {escrowError && (
                 <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-left text-sm text-rose-700 flex items-start gap-2">
@@ -546,7 +561,7 @@ const CreateContract = () => {
                     View Contract Details
                   </Link>
                 )}
-                {createdContract?.id && !createdContract?.funded_at && !escrowResult && (
+                {createdContract?.id && !createdContract?.funded_at && !escrowResult && !escrowWalletPromptOpen && (
                   <button
                     type="button"
                     onClick={() => void handleCreateEscrow()}
@@ -556,6 +571,70 @@ const CreateContract = () => {
                     <Wallet className="w-4 h-4" />
                     {isCreatingEscrow ? 'Creating Escrow...' : 'Create Escrow Contract'}
                   </button>
+                )}
+                {createdContract?.id && !createdContract?.funded_at && !escrowResult && escrowWalletPromptOpen && (
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left space-y-3">
+                    <div>
+                      <h4 className="text-sm font-semibold text-slate-900">Escrow Wallet Addresses</h4>
+                      <p className="text-xs text-slate-500 mt-1">
+                        Enter the student and judge wallet addresses before we lock the escrow on-chain. Both are required so payouts and dispute rewards reach the right accounts.
+                      </p>
+                    </div>
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 mb-1.5">Student Wallet Address *</label>
+                        <input
+                          type="text"
+                          value={escrowStudentWallet}
+                          onChange={(event) => {
+                            setEscrowStudentWallet(event.target.value);
+                            setEscrowError('');
+                          }}
+                          placeholder="0x..."
+                          className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 mb-1.5">Judge Wallet Address *</label>
+                        <input
+                          type="text"
+                          value={escrowJudgeWallet}
+                          onChange={(event) => {
+                            setEscrowJudgeWallet(event.target.value);
+                            setEscrowError('');
+                          }}
+                          placeholder="0x..."
+                          className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono"
+                        />
+                      </div>
+                    </div>
+                    <div className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-700">
+                      The judge wallet receives the reward when a dispute is resolved, so it must be entered now.
+                    </div>
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEscrowWalletPromptOpen(false);
+                          setEscrowStudentWallet('');
+                          setEscrowJudgeWallet('');
+                          setEscrowError('');
+                        }}
+                        className="flex-1 py-2.5 bg-white text-slate-700 rounded-xl font-semibold text-sm hover:bg-slate-100 border border-slate-200 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void handleCreateEscrow(escrowStudentWallet, escrowJudgeWallet)}
+                        disabled={isCreatingEscrow || !escrowStudentWallet.trim() || !escrowJudgeWallet.trim()}
+                        className="flex-1 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl font-semibold text-sm hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
+                      >
+                        <Wallet className="w-4 h-4" />
+                        {isCreatingEscrow ? 'Locking Escrow...' : 'Continue & Lock Escrow'}
+                      </button>
+                    </div>
+                  </div>
                 )}
                 {createdContract?.id && (
                   <Link to={`/company/contracts/${createdContract.id}/fund`} className="block w-full py-3 bg-slate-50 text-slate-700 rounded-xl font-semibold text-sm hover:bg-slate-100 border border-slate-200 transition-colors">

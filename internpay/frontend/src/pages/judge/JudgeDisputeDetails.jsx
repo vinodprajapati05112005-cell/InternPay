@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 import { contractApi, disputeApi, submissionApi } from '../../services/api';
 import { compactHash, formatDateTime, formatTokenAmount, humanizeEnum } from '../../utils/formatters';
+import { getEscrowExplorerTxUrl, hasEscrowContractConfig, resolveDisputeOnChain, toEscrowWei } from '../../utils/blockchain';
 
 const decisionButtons = [
   {
@@ -86,6 +87,7 @@ const JudgeDisputeDetails = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [confirmation, setConfirmation] = useState(null);
+  const [resolutionTxHash, setResolutionTxHash] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -153,7 +155,14 @@ const JudgeDisputeDetails = () => {
 
   const disputeStatus = String(dispute?.status || '').toUpperCase();
   const canResolve = Boolean(dispute && !dispute.resolved_at);
-  const disputedAmount = Number(dispute?.disputed_amount || submission?.milestone?.amount || 0);
+  const disputeAmountSource = dispute?.disputed_amount || submission?.milestone?.amount || 0;
+  const disputedAmount = Number(disputeAmountSource || 0);
+  const disputedAmountWei = toEscrowWei(disputeAmountSource);
+  const escrowId = submission?.contract_metadata?.escrow_id || submission?.contract_metadata?.escrowId || '';
+  const milestoneOrder = Number(submission?.milestone_order || submission?.milestone?.order || 0);
+  const hasMilestoneOrder = Number.isFinite(milestoneOrder) && milestoneOrder > 0;
+  const hasOnChainEscrow = Boolean(escrowId && hasMilestoneOrder && hasEscrowContractConfig());
+  const resolutionTxUrl = getEscrowExplorerTxUrl(resolutionTxHash);
 
   const statusStyles = {
     OPEN: 'bg-blue-100 text-blue-700',
@@ -179,6 +188,7 @@ const JudgeDisputeDetails = () => {
 
     setIsSaving(true);
     setError('');
+    setResolutionTxHash('');
 
     try {
       const payload = {
@@ -190,12 +200,42 @@ const JudgeDisputeDetails = () => {
         payload.split_percentage = Number(splitPercentage);
       }
 
+      if (!hasOnChainEscrow) {
+        throw new Error('Set VITE_ESCROW_CONTRACT_ADDRESS and make sure this submission has an escrow id before resolving on-chain.');
+      }
+
+      let releasedToInternWei = 0n;
+      let refundedToCompanyWei = 0n;
+      if (decisionType === 'RELEASE_PAYMENT') {
+        releasedToInternWei = disputedAmountWei;
+      } else if (decisionType === 'REFUND_COMPANY') {
+        refundedToCompanyWei = disputedAmountWei;
+      } else {
+        const split = BigInt(Number(splitPercentage));
+        releasedToInternWei = (disputedAmountWei * split) / 100n;
+        refundedToCompanyWei = disputedAmountWei - releasedToInternWei;
+      }
+
+      const onChainResolution = await resolveDisputeOnChain({
+        escrowId,
+        milestoneId: milestoneOrder,
+        decision: decisionType,
+        releasedToInternWei,
+        refundedToCompanyWei,
+      });
+
+      setResolutionTxHash(onChainResolution.txHash);
+      payload.transaction_hash = onChainResolution.txHash;
+      payload.judge_reward = onChainResolution.judgeRewardEth;
+
       const updated = await disputeApi.resolve(id, payload);
       setDispute(updated || null);
       setConfirmation(updated || {
         decision: decisionType,
         reasoning: reasoning.trim(),
         split_percentage: splitPercentage ? Number(splitPercentage) : null,
+        transaction_hash: onChainResolution.txHash,
+        judge_reward: onChainResolution.judgeRewardEth,
       });
       setShowConfirmation(true);
     } catch (saveError) {
@@ -699,6 +739,20 @@ const JudgeDisputeDetails = () => {
                   <span className="text-slate-500">Case</span>
                   <span className="font-semibold text-slate-900">{compactHash(dispute.id)}</span>
                 </div>
+                {resolutionTxHash && resolutionTxUrl && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-slate-500">Transaction</span>
+                    <a
+                      href={resolutionTxUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="font-semibold text-blue-600 hover:text-blue-700 inline-flex items-center gap-1"
+                    >
+                      {compactHash(resolutionTxHash)}
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                  </div>
+                )}
               </div>
               <button
                 onClick={() => setShowConfirmation(false)}

@@ -18,6 +18,7 @@ const ESCROW_ABI = [
   'function rejectMilestone(uint64 escrow_id, uint32 milestone_id)',
   'function cancelEscrow(uint64 escrow_id)',
   'function raiseDispute(uint64 escrow_id, uint32 milestone_id, bytes32 evidence_hash)',
+  'function depositDisputeBond(uint64 escrow_id, uint32 milestone_id) payable',
   'function resolveDispute(uint64 escrow_id, uint32 milestone_id, uint8 decision, uint256 released_to_intern, uint256 refunded_to_company)',
   'event EscrowCreated(uint64 indexed escrowId, address indexed company, address indexed intern, uint256 totalAmount)',
   'event FundsDeposited(uint64 indexed escrowId, uint256 amount)',
@@ -25,11 +26,18 @@ const ESCROW_ABI = [
   'event MilestoneApproved(uint64 indexed escrowId, uint32 indexed milestoneId)',
   'event MilestoneRejected(uint64 indexed escrowId, uint32 indexed milestoneId)',
   'event DisputeRaised(uint64 indexed escrowId, uint32 indexed milestoneId, address indexed filedBy, bytes32 evidenceHash)',
-  'event JudgeDecision(uint64 indexed escrowId, uint32 indexed milestoneId, uint8 decision, uint256 releasedToIntern, uint256 refundedToCompany)',
+  'event DisputeBondDeposited(uint64 indexed escrowId, uint32 indexed milestoneId, address indexed sender, uint256 amount)',
+  'event JudgeDecision(uint64 indexed escrowId, uint32 indexed milestoneId, uint8 decision, uint256 releasedToIntern, uint256 refundedToCompany, uint256 judgeReward)',
   'event PaymentReleased(uint64 indexed escrowId, uint256 amount)',
   'event RefundExecuted(uint64 indexed escrowId, uint256 amount)',
   'event EscrowCancelled(uint64 indexed escrowId)',
 ];
+
+const DISPUTE_DECISION_VALUES = {
+  RELEASE_PAYMENT: 1,
+  REFUND_COMPANY: 2,
+  PARTIAL_PAYMENT: 3,
+};
 
 export const getEscrowContractAddress = () => (import.meta.env.VITE_ESCROW_CONTRACT_ADDRESS || '').trim();
 
@@ -55,6 +63,30 @@ export const buildEvidenceHash = (payload) => {
 };
 
 export const toEscrowWei = (value) => parseEther(String(value ?? '0'));
+
+export const weiToEthString = (value, precision = 6) => {
+  try {
+    const wei = typeof value === 'bigint' ? value : BigInt(String(value ?? '0'));
+    const sign = wei < 0n ? '-' : '';
+    const absolute = wei < 0n ? -wei : wei;
+    const whole = absolute / 10n ** 18n;
+    const remainder = absolute % 10n ** 18n;
+
+    if (precision <= 0) {
+      return `${sign}${whole.toString()}`;
+    }
+
+    const fraction = remainder
+      .toString()
+      .padStart(18, '0')
+      .slice(0, precision)
+      .replace(/0+$/, '');
+
+    return fraction ? `${sign}${whole.toString()}.${fraction}` : `${sign}${whole.toString()}`;
+  } catch {
+    return '0';
+  }
+};
 
 const assertExpectedNetwork = async (provider) => {
   const network = await provider.getNetwork();
@@ -108,6 +140,11 @@ const parseEvent = (receipt, contract, eventName) => {
   return null;
 };
 
+const resolveDecisionValue = (decision) => {
+  const normalized = String(decision || '').trim().toUpperCase();
+  return DISPUTE_DECISION_VALUES[normalized] || 0;
+};
+
 export const createAndLockEscrow = async ({
   internAddress,
   judgeAddress,
@@ -121,7 +158,11 @@ export const createAndLockEscrow = async ({
     throw new Error('A valid student wallet address is required to create the escrow.');
   }
 
-  const resolvedJudgeAddress = isAddress(judgeAddress) ? getAddress(judgeAddress) : signerAddress;
+  if (!isAddress(judgeAddress)) {
+    throw new Error('A valid judge wallet address is required to create the escrow.');
+  }
+
+  const resolvedJudgeAddress = getAddress(judgeAddress);
   const totalWei = toEscrowWei(totalAmountEth);
 
   if (totalWei <= 0n) {
@@ -190,6 +231,67 @@ export const submitMilestoneOnChain = async ({
   return {
     txHash: tx.hash,
     evidenceHash: buildEvidenceHash(evidence),
+  };
+};
+
+export const depositDisputeBondOnChain = async ({
+  escrowId,
+  milestoneId,
+  amountEth,
+}) => {
+  const contract = await getEscrowContract();
+  const bondWei = toEscrowWei(amountEth);
+  if (bondWei <= 0n) {
+    throw new Error('The dispute bond must be greater than zero.');
+  }
+
+  const tx = await contract.depositDisputeBond(BigInt(escrowId), Number(milestoneId), { value: bondWei });
+  const receipt = await tx.wait();
+  const bondEvent = parseEvent(receipt, contract, 'DisputeBondDeposited');
+
+  return {
+    txHash: tx.hash,
+    bondWei,
+    bondAmountEth: weiToEthString(bondWei),
+    sender: bondEvent?.args?.sender ?? bondEvent?.args?.[2] ?? '',
+  };
+};
+
+export const resolveDisputeOnChain = async ({
+  escrowId,
+  milestoneId,
+  decision,
+  releasedToInternWei = 0n,
+  refundedToCompanyWei = 0n,
+}) => {
+  const contract = await getEscrowContract();
+  const decisionValue = resolveDecisionValue(decision);
+  if (!decisionValue) {
+    throw new Error('Invalid dispute decision.');
+  }
+
+  const releasedWei = typeof releasedToInternWei === 'bigint' ? releasedToInternWei : BigInt(String(releasedToInternWei ?? 0));
+  const refundedWei = typeof refundedToCompanyWei === 'bigint' ? refundedToCompanyWei : BigInt(String(refundedToCompanyWei ?? 0));
+  const tx = await contract.resolveDispute(
+    BigInt(escrowId),
+    Number(milestoneId),
+    decisionValue,
+    releasedWei,
+    refundedWei,
+  );
+  const receipt = await tx.wait();
+  const decisionEvent = parseEvent(receipt, contract, 'JudgeDecision');
+
+  const judgeRewardWei = BigInt(decisionEvent?.args?.judgeReward ?? decisionEvent?.args?.[5] ?? 0n);
+  const releasedWeiFromEvent = decisionEvent?.args?.releasedToIntern ?? decisionEvent?.args?.[3] ?? releasedWei;
+  const refundedWeiFromEvent = decisionEvent?.args?.refundedToCompany ?? decisionEvent?.args?.[4] ?? refundedWei;
+
+  return {
+    txHash: tx.hash,
+    releasedToInternWei: typeof releasedWeiFromEvent === 'bigint' ? releasedWeiFromEvent : BigInt(String(releasedWeiFromEvent ?? 0)),
+    refundedToCompanyWei: typeof refundedWeiFromEvent === 'bigint' ? refundedWeiFromEvent : BigInt(String(refundedWeiFromEvent ?? 0)),
+    judgeRewardWei,
+    judgeRewardEth: weiToEthString(judgeRewardWei),
   };
 };
 

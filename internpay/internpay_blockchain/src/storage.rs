@@ -28,6 +28,9 @@ pub struct StorageMilestone {
 pub struct StorageDispute {
     pub filed_by: StorageAddress,
     pub evidence_hash: StorageB256,
+    pub company_bond: StorageU256,
+    pub intern_bond: StorageU256,
+    pub judge_reward: StorageU256,
     pub resolved_at: StorageU64,
     pub status: StorageU8,
     pub decision: StorageU8,

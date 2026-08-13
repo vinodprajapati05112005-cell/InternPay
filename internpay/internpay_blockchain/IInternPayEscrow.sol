@@ -27,5 +27,7 @@ interface IInternPayEscrow {
 
     function raiseDispute(uint64 escrow_id, uint32 milestone_id, bytes32 evidence_hash) external;
 
+    function depositDisputeBond(uint64 escrow_id, uint32 milestone_id) external payable;
+
     function resolveDispute(uint64 escrow_id, uint32 milestone_id, uint8 decision, uint256 released_to_intern, uint256 refunded_to_company) external;
 }
