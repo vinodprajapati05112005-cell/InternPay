@@ -113,6 +113,39 @@ const connectEscrowProvider = async () => {
   return { provider, signer };
 };
 
+const getContractProvider = (contract) => {
+  const provider = contract?.runner?.provider ?? contract?.provider ?? null;
+  if (!provider) {
+    throw new Error('Wallet provider is unavailable.');
+  }
+
+  return provider;
+};
+
+const buildCurrentFeeOverrides = async (contract, { value } = {}) => {
+  const provider = getContractProvider(contract);
+  const feeData = await provider.getFeeData();
+  const overrides = {};
+
+  if (value !== undefined) {
+    overrides.value = value;
+  }
+
+  if (feeData?.maxFeePerGas != null && feeData?.maxPriorityFeePerGas != null) {
+    overrides.maxFeePerGas = feeData.maxFeePerGas;
+    overrides.maxPriorityFeePerGas = feeData.maxPriorityFeePerGas;
+  } else if (feeData?.gasPrice != null) {
+    overrides.gasPrice = feeData.gasPrice;
+  }
+
+  return overrides;
+};
+
+const sendWithCurrentFees = async (contract, methodName, args = [], options = {}) => {
+  const overrides = await buildCurrentFeeOverrides(contract, options);
+  return contract[methodName](...args, overrides);
+};
+
 export const getEscrowContract = async () => {
   const address = getEscrowContractAddress();
   if (!address) {
@@ -171,7 +204,11 @@ export const createAndLockEscrow = async ({
     throw new Error('The escrow amount must be greater than zero.');
   }
 
-  const createTx = await contract.createEscrow(getAddress(internAddress), resolvedJudgeAddress, totalWei);
+  const createTx = await sendWithCurrentFees(contract, 'createEscrow', [
+    getAddress(internAddress),
+    resolvedJudgeAddress,
+    totalWei,
+  ]);
   const createReceipt = await createTx.wait();
   const createdEvent = parseEvent(createReceipt, contract, 'EscrowCreated');
   const escrowId = createdEvent?.args?.escrowId ?? createdEvent?.args?.[0];
@@ -191,11 +228,16 @@ export const createAndLockEscrow = async ({
       throw new Error('Each milestone must have a valid order number.');
     }
 
-    const addTx = await contract.addMilestone(normalizedEscrowId, milestoneId, amountWei, deadlineUnix);
+    const addTx = await sendWithCurrentFees(contract, 'addMilestone', [
+      normalizedEscrowId,
+      milestoneId,
+      amountWei,
+      deadlineUnix,
+    ]);
     await addTx.wait();
   }
 
-  const lockTx = await contract.lockFunds(normalizedEscrowId, { value: totalWei });
+  const lockTx = await sendWithCurrentFees(contract, 'lockFunds', [normalizedEscrowId], { value: totalWei });
   await lockTx.wait();
 
   return {
@@ -213,7 +255,7 @@ export const lockExistingEscrowFunds = async ({
 }) => {
   const contract = await getEscrowContract();
   const totalWei = toEscrowWei(totalAmountEth);
-  const tx = await contract.lockFunds(BigInt(escrowId), { value: totalWei });
+  const tx = await sendWithCurrentFees(contract, 'lockFunds', [BigInt(escrowId)], { value: totalWei });
   await tx.wait();
 
   return {
@@ -227,7 +269,11 @@ export const submitMilestoneOnChain = async ({
   evidence,
 }) => {
   const contract = await getEscrowContract();
-  const tx = await contract.submitMilestone(BigInt(escrowId), Number(milestoneId), buildEvidenceHash(evidence));
+  const tx = await sendWithCurrentFees(contract, 'submitMilestone', [
+    BigInt(escrowId),
+    Number(milestoneId),
+    buildEvidenceHash(evidence),
+  ]);
   await tx.wait();
 
   return {
@@ -247,7 +293,10 @@ export const depositDisputeBondOnChain = async ({
     throw new Error('The dispute bond must be greater than zero.');
   }
 
-  const tx = await contract.depositDisputeBond(BigInt(escrowId), Number(milestoneId), { value: bondWei });
+  const tx = await sendWithCurrentFees(contract, 'depositDisputeBond', [
+    BigInt(escrowId),
+    Number(milestoneId),
+  ], { value: bondWei });
   const receipt = await tx.wait();
   const bondEvent = parseEvent(receipt, contract, 'DisputeBondDeposited');
 
@@ -274,13 +323,13 @@ export const resolveDisputeOnChain = async ({
 
   const releasedWei = typeof releasedToInternWei === 'bigint' ? releasedToInternWei : BigInt(String(releasedToInternWei ?? 0));
   const refundedWei = typeof refundedToCompanyWei === 'bigint' ? refundedToCompanyWei : BigInt(String(refundedToCompanyWei ?? 0));
-  const tx = await contract.resolveDispute(
+  const tx = await sendWithCurrentFees(contract, 'resolveDispute', [
     BigInt(escrowId),
     Number(milestoneId),
     decisionValue,
     releasedWei,
     refundedWei,
-  );
+  ]);
   const receipt = await tx.wait();
   const decisionEvent = parseEvent(receipt, contract, 'JudgeDecision');
 
@@ -302,7 +351,10 @@ export const releaseMilestoneOnChain = async ({
   milestoneId,
 }) => {
   const contract = await getEscrowContract();
-  const tx = await contract.approveMilestone(BigInt(escrowId), Number(milestoneId));
+  const tx = await sendWithCurrentFees(contract, 'approveMilestone', [
+    BigInt(escrowId),
+    Number(milestoneId),
+  ]);
   await tx.wait();
 
   return {
