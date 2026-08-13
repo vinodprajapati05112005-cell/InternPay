@@ -109,6 +109,9 @@ def create_submission(*, student, validated_data: dict, request=None) -> Submiss
     milestone.submitted_at = submission.submitted_at
     milestone.save(update_fields=["status", "submitted_at", "updated_at"])
 
+    from apps.ai_engine.services import evaluate_submission_with_ai
+    run_after_commit(lambda: evaluate_submission_with_ai(submission=submission), label="AI evaluation")
+
     return submission
 
 
@@ -121,6 +124,10 @@ def update_submission(*, submission: Submission, validated_data: dict, request=N
     submission.status = SubmissionStatus.SUBMITTED
     submission.save()
     _store_files(submission, files)
+
+    from apps.ai_engine.services import evaluate_submission_with_ai
+    run_after_commit(lambda: evaluate_submission_with_ai(submission=submission, force=True), label="AI evaluation")
+
     return submission
 
 
