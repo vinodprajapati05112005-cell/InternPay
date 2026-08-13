@@ -112,6 +112,10 @@ const CreateContract = () => {
     if (!projectData.judge_id.trim()) nextErrors.judge_id = 'Judge wallet, email, or profile ID is required';
     if (!termsAccepted) nextErrors.terms = 'You must accept the terms';
     if (Object.keys(nextErrors).length) {
+      if (nextErrors.student_id || nextErrors.judge_id) {
+        nextErrors._form = 'Please fill in the student and judge details in Step 1 before creating the contract.';
+        setStep(1);
+      }
       setErrors(nextErrors);
       return;
     }
@@ -140,6 +144,9 @@ const CreateContract = () => {
       };
 
       const result = await contractApi.create(payload);
+      if (!result?.id) {
+        throw new Error('The contract was saved, but the backend did not return a contract ID.');
+      }
       setCreatedContract(result);
       setShowSuccess(true);
     } catch (saveError) {
@@ -151,6 +158,12 @@ const CreateContract = () => {
 
   const handleCreateEscrow = async (studentWalletOverride = '', judgeWalletOverride = '') => {
     if (!createdContract?.id) {
+      setEscrowError('Save the contract first before locking escrow on-chain.');
+      return;
+    }
+
+    if (!hasEscrowContractConfig()) {
+      setEscrowError('Set VITE_ESCROW_CONTRACT_ADDRESS before locking the escrow on-chain.');
       return;
     }
 
@@ -297,7 +310,7 @@ const CreateContract = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Student Wallet / Email / Profile ID</label>
+                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Student Wallet / Email / Profile ID *</label>
                 <input
                   type="text"
                   value={projectData.student_id}
@@ -308,7 +321,7 @@ const CreateContract = () => {
                 {errors.student_id && <p className="text-red-500 text-xs mt-1">{errors.student_id}</p>}
               </div>
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Judge Wallet / Email / Profile ID</label>
+                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Judge Wallet / Email / Profile ID *</label>
                 <input
                   type="text"
                   value={projectData.judge_id}
@@ -557,7 +570,7 @@ const CreateContract = () => {
 
               {!hasEscrowContractConfig() && !escrowResult && (
                 <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-left text-sm text-amber-700">
-                  Set <code className="font-mono">VITE_ESCROW_CONTRACT_ADDRESS</code> to enable the on-chain popup.
+                  Set <code className="font-mono">VITE_ESCROW_CONTRACT_ADDRESS</code> to lock the escrow on-chain.
                 </div>
               )}
 
@@ -571,7 +584,7 @@ const CreateContract = () => {
                   <button
                     type="button"
                     onClick={() => void handleCreateEscrow()}
-                    disabled={isCreatingEscrow || !hasEscrowContractConfig()}
+                    disabled={isCreatingEscrow}
                     className="block w-full py-3 bg-white text-slate-700 rounded-xl font-semibold text-sm hover:bg-slate-50 border border-slate-200 transition-colors disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
                   >
                     <Wallet className="w-4 h-4" />
