@@ -39,6 +39,20 @@ const DISPUTE_DECISION_VALUES = {
   PARTIAL_PAYMENT: 3,
 };
 
+const ESCROW_ERROR_MESSAGES = {
+  '0x742c612c': 'Only the company wallet can perform this action.',
+  '0x8a64f3d8': 'The escrow is not ready yet. Make sure the contract is funded and the milestone has been submitted on-chain.',
+  '0xfda7bbda': 'The escrow does not contain enough locked funds.',
+  '0xf8e89d8b': 'The milestone deadline has already passed.',
+  '0x2434d2be': 'The milestone deadline has not passed yet.',
+  '0xd5d9a6aa': 'The judge wallet is invalid.',
+  '0x086b9796': 'This milestone has already been submitted on-chain.',
+  '0x1c415361': 'The blockchain transfer failed.',
+  '0xd27def68': 'The amount provided is invalid.',
+  '0x5c0e06e8': 'The escrow id was not found.',
+  '0x37b77e28': 'The milestone id was not found.',
+};
+
 export const DEFAULT_DISPUTE_BOND_ETH = '0.00001';
 
 export const getEscrowContractAddress = () => (import.meta.env.VITE_ESCROW_CONTRACT_ADDRESS || '').trim();
@@ -178,6 +192,46 @@ const parseEvent = (receipt, contract, eventName) => {
 const resolveDecisionValue = (decision) => {
   const normalized = String(decision || '').trim().toUpperCase();
   return DISPUTE_DECISION_VALUES[normalized] || 0;
+};
+
+const extractRevertSelector = (error) => {
+  const candidates = [
+    error?.data,
+    error?.error?.data,
+    error?.info?.error?.data,
+    error?.info?.data,
+    error?.cause?.data,
+  ];
+
+  for (const candidate of candidates) {
+    if (!candidate) {
+      continue;
+    }
+
+    if (typeof candidate === 'string' && candidate.startsWith('0x') && candidate.length >= 10) {
+      return candidate.slice(0, 10).toLowerCase();
+    }
+
+    if (typeof candidate === 'object' && typeof candidate.data === 'string' && candidate.data.startsWith('0x') && candidate.data.length >= 10) {
+      return candidate.data.slice(0, 10).toLowerCase();
+    }
+  }
+
+  return '';
+};
+
+export const formatEscrowErrorMessage = (error, fallback = 'Unable to complete the blockchain transaction.') => {
+  const selector = extractRevertSelector(error);
+  if (selector && ESCROW_ERROR_MESSAGES[selector]) {
+    return ESCROW_ERROR_MESSAGES[selector];
+  }
+
+  const message = String(error?.shortMessage || error?.reason || error?.message || '').trim();
+  if (message) {
+    return message;
+  }
+
+  return fallback;
 };
 
 export const createAndLockEscrow = async ({

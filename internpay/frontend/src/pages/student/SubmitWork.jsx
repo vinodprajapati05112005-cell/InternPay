@@ -21,6 +21,11 @@ import {
 } from 'lucide-react';
 import { contractApi, submissionApi } from '../../services/api';
 import { formatCurrency, formatDate, humanizeEnum } from '../../utils/formatters';
+import {
+  formatEscrowErrorMessage,
+  hasEscrowContractConfig,
+  submitMilestoneOnChain,
+} from '../../utils/blockchain';
 
 const SubmitWork = () => {
   const { id } = useParams();
@@ -66,6 +71,13 @@ const SubmitWork = () => {
     return contract?.milestones?.find((milestone) => milestone.id === selectedMilestoneId) || null;
   }, [contract, selectedMilestoneId]);
 
+  const escrowId = contract?.metadata?.escrow_id || contract?.metadata?.escrowId || '';
+  const hasOnChainEscrow = Boolean(
+    escrowId &&
+    hasEscrowContractConfig() &&
+    Number(contract?.funded_amount || 0) > 0,
+  );
+
   const handleChange = (field, value) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
     if (errors[field]) {
@@ -96,6 +108,43 @@ const SubmitWork = () => {
     setIsSubmitting(true);
 
     try {
+      let transactionHash = '';
+
+      if (hasOnChainEscrow) {
+        const milestoneOrder = Number(selectedMilestone?.order || 0);
+        if (!milestoneOrder) {
+          setErrors({ _form: 'Unable to resolve the milestone order for on-chain submission.' });
+          return;
+        }
+
+        try {
+          const onChainSubmission = await submitMilestoneOnChain({
+            escrowId,
+            milestoneId: milestoneOrder,
+            evidence: {
+              contract_id: id,
+              milestone_id: selectedMilestoneId,
+              milestone_order: milestoneOrder,
+              github_url: formData.github_url.trim(),
+              demo_url: formData.demo_url.trim(),
+              figma_url: formData.figma_url.trim(),
+              documentation_url: formData.documentation_url.trim(),
+              video_url: formData.video_url.trim(),
+              additional_notes: formData.additional_notes.trim(),
+            },
+          });
+          transactionHash = onChainSubmission.txHash;
+        } catch (chainError) {
+          setErrors({
+            _form: formatEscrowErrorMessage(
+              chainError,
+              'Unable to record the milestone on-chain. Please make sure the escrow is funded and your wallet is connected.',
+            ),
+          });
+          return;
+        }
+      }
+
       const submission = await submissionApi.create({
         contract_id: id,
         milestone_id: selectedMilestoneId,
@@ -105,9 +154,14 @@ const SubmitWork = () => {
         documentation_url: formData.documentation_url.trim(),
         video_url: formData.video_url.trim(),
         additional_notes: formData.additional_notes.trim(),
+        transaction_hash: transactionHash,
       });
 
-      setSuccessMessage('Work submitted successfully. Redirecting to your submission details...');
+      setSuccessMessage(
+        hasOnChainEscrow
+          ? 'Work submitted successfully and recorded on-chain. Redirecting to your submission details...'
+          : 'Work submitted successfully. Redirecting to your submission details...',
+      );
       navigate(`/student/submissions/${submission.id}`, { replace: true });
     } catch (submitError) {
       setErrors({ _form: submitError?.message || 'Unable to submit your work right now.' });
@@ -410,6 +464,9 @@ const SubmitWork = () => {
               </div>
               <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
                 Work submissions are saved directly to the backend and AI evaluation runs automatically after upload.
+                {hasOnChainEscrow
+                  ? ' This submission will also be recorded on-chain.'
+                  : ' On-chain submission is unavailable until the escrow is funded and the blockchain contract is configured.'}
               </div>
             </div>
           </div>

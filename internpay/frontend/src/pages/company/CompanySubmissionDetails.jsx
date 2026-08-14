@@ -31,6 +31,7 @@ import {
   depositDisputeBondOnChain,
   getEscrowExplorerTxUrl,
   hasEscrowContractConfig,
+  formatEscrowErrorMessage,
   releaseMilestoneOnChain,
 } from '../../utils/blockchain';
 
@@ -332,7 +333,7 @@ const CompanySubmissionDetails = () => {
       }));
       setReleaseSuccess('Funds released successfully to the student wallet.');
     } catch (releaseError) {
-      setReleaseError(releaseError?.message || 'Unable to release funds.');
+      setReleaseError(formatEscrowErrorMessage(releaseError, 'Unable to release funds.'));
     } finally {
       setIsReleasing(false);
     }

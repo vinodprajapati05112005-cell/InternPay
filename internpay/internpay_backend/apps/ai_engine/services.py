@@ -154,7 +154,7 @@ def build_prompt(submission) -> str:
         "5. overall_score (0-100): Weighted aggregate score reflecting total project quality.\n"
         "6. strengths: Array of 2-5 concrete, specific accomplishments or positive aspects observed in the submission.\n"
         "7. weaknesses: Array of 1-4 specific gaps, missing requirements, or areas for improvement.\n"
-        "8. recommendation: Must be strictly one of: APPROVED (score >= 80), APPROVED_WITH_NOTES (70-79), HUMAN_REVIEW (60-69), REJECTED (< 60).\n"
+        "8. recommendation: Must be strictly one of: APPROVED (score >= 80), APPROVED_WITH_NOTES (70-79), HUMAN_REVIEW (below 70). Do not auto-reject a contract solely because the score is low.\n"
         "9. explanation: Detailed 2-4 sentence summary explaining the scoring justification.\n"
         "10. status: Must be COMPLETED.\n\n"
         "Return STRICT JSON only without markdown fences or additional text.\n\n"
@@ -392,6 +392,8 @@ def _normalize_report(data: dict) -> dict:
     recommendation = str(data.get("recommendation") or recommendation_from_score(overall_score)).upper()
     if recommendation not in {choice[0] for choice in AIRecommendation.choices}:
         recommendation = recommendation_from_score(overall_score)
+    elif recommendation == AIRecommendation.REJECTED:
+        recommendation = AIRecommendation.HUMAN_REVIEW
 
     status = str(data.get("status") or "COMPLETED").upper()
     if status not in {choice[0] for choice in AIAnalysisStatus.choices}:
@@ -449,7 +451,7 @@ def evaluate_submission_with_ai(*, submission, request=None, force: bool = False
         AIRecommendation.APPROVED: SubmissionStatus.APPROVED,
         AIRecommendation.APPROVED_WITH_NOTES: SubmissionStatus.APPROVED_WITH_NOTES,
         AIRecommendation.HUMAN_REVIEW: SubmissionStatus.HUMAN_REVIEW,
-        AIRecommendation.REJECTED: SubmissionStatus.REJECTED,
+        AIRecommendation.REJECTED: SubmissionStatus.HUMAN_REVIEW,
     }.get(report.recommendation, SubmissionStatus.HUMAN_REVIEW)
     submission.save(update_fields=["evaluated_at", "status", "updated_at"])
 

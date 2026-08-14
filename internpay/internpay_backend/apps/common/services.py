@@ -77,6 +77,4 @@ def recommendation_from_score(overall_score: int) -> str:
         return "APPROVED"
     if overall_score >= 70:
         return "APPROVED_WITH_NOTES"
-    if overall_score >= 60:
-        return "HUMAN_REVIEW"
-    return "REJECTED"
+    return "HUMAN_REVIEW"
