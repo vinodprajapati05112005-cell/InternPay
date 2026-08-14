@@ -269,10 +269,11 @@ const CompanySubmissionDetails = () => {
   }
 
   const evaluation = report || submission.ai_report;
-  const score = evaluation?.overall_score || submission.ai_score || 0;
+  const score = evaluation?.overall_score ?? submission.ai_score ?? 0;
   const linkEntries = submission.links || {};
+  const hasScoreData = evaluation?.overall_score != null || submission.ai_score != null;
   const hasEvaluation = Boolean(evaluation);
-  const scoreClass = hasEvaluation ? getScoreColor(score) : 'text-slate-500';
+  const scoreClass = hasScoreData ? getScoreColor(score) : 'text-slate-500';
   const escrowId = submission?.contract_metadata?.escrow_id || submission?.contract_metadata?.escrowId || '';
   const milestoneOrder = Number(submission?.milestone_order || 0);
   const hasMilestoneOrder = Number.isFinite(milestoneOrder) && milestoneOrder > 0;
@@ -534,7 +535,7 @@ const CompanySubmissionDetails = () => {
               <div className="flex justify-between items-center text-sm">
                 <span className="text-slate-500">AI Score</span>
                 <span className={`font-extrabold ${scoreClass}`}>
-                  {hasEvaluation ? `${score}/100` : 'Awaiting review'}
+                  {hasScoreData ? `${score}/100` : 'Awaiting review'}
                 </span>
               </div>
               <div className="flex justify-between items-center text-sm">
@@ -565,7 +566,7 @@ const CompanySubmissionDetails = () => {
               <button
                 type="button"
                 onClick={() => void handleReleasePayment()}
-                disabled={isReleasing || !hasEvaluation || !hasOnChainEscrow || isDisputed}
+                disabled={isReleasing || !hasOnChainEscrow || isDisputed}
                 className="mt-2 w-full inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-4 py-3 text-sm font-semibold text-white shadow-lg transition-all hover:from-emerald-700 hover:to-teal-700 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {isReleasing ? <Loader2 className="w-4 h-4 animate-spin" /> : <ThumbsUp className="w-4 h-4" />}
@@ -581,11 +582,9 @@ const CompanySubmissionDetails = () => {
                   Set <code className="font-mono">VITE_ESCROW_CONTRACT_ADDRESS</code> and create an escrow id to enable on-chain release.
                 </p>
               )}
-              {!hasEvaluation && (
-                <p className="text-xs text-slate-500">
-                  Wait for the AI evaluation before releasing funds.
-                </p>
-              )}
+              <p className="text-xs text-slate-500">
+                AI score is informational only and does not block release.
+              </p>
             </div>
           </motion.div>
         </div>

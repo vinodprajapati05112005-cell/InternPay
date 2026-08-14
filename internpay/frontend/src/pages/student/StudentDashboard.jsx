@@ -274,6 +274,7 @@ const StudentDashboard = () => {
                     </div>
                     <div className="flex gap-2 mt-2">
                       <button
+                        type="button"
                         onClick={() => handleAcceptContract(contract.id)}
                         disabled={actionLoading[contract.id]}
                         className="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold shadow transition-colors flex items-center justify-center gap-1.5 disabled:opacity-60"
@@ -285,6 +286,7 @@ const StudentDashboard = () => {
                         )}
                       </button>
                       <button
+                        type="button"
                         onClick={() => handleRejectContract(contract.id)}
                         disabled={actionLoading[contract.id]}
                         className="flex-1 px-4 py-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 disabled:opacity-60"
