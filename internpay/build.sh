@@ -9,8 +9,11 @@ npm run build
 # Build Django backend
 cd ../internpay_backend
 
-python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
+# Install Python dependencies using uv
+uv pip install --system -r requirements.txt
 
+# Collect Django static files
 python manage.py collectstatic --noinput
+
+# Apply database migrations
 python manage.py migrate
